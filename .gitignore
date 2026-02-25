@@ -1,0 +1,39 @@
+# ─── OS Files ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE / Editor ────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── Maven (root catch-all; subproject has its own) ──────────
+**/target/
+!**/target/.gitkeep
+
+# ─── Quarkus dev mode ────────────────────────────────────────
+**/.quarkus/
+
+# ─── Java compiled output ────────────────────────────────────
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+
+# ─── Shell script generated/temp files ───────────────────────
+*.log
+*.tmp
+*.bak
+
+# ─── Credentials / secrets (never commit these) ──────────────
+*.env
+.env
+*.pem
+*.key
+kubeconfig
+oc-login*.sh

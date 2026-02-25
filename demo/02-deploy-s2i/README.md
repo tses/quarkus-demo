@@ -1,0 +1,106 @@
+# ACT 2 — Deploy with S2I ⭐ WOW #1
+
+> **Duration:** ~10 minutes  
+> **Wow Factor:** Git URL → Running App. No Dockerfile. No YAML. No ops ticket.  
+> **Message:** *"Ο developer δίνει κώδικα. Το platform κάνει τα υπόλοιπα."*
+
+---
+
+## 🎯 What is S2I?
+
+**Source-to-Image (S2I)** is an OpenShift mechanism that:
+1. Takes your **source code** (Git URL)
+2. Detects the **language/framework** automatically
+3. Builds a **container image** — no Dockerfile needed
+4. **Deploys** it and exposes it — with a live URL
+
+> 💬 *"Δεν χρειάζεστε να ξέρετε τίποτα για containers για να κάνετε deploy. Το platform το αφαιρεί."*
+
+---
+
+## 🖥️ Steps
+
+### 1. Switch to Developer Perspective → +Add
+
+Navigate to: **Developer → +Add → Import from Git**
+
+---
+
+### 2. Paste the Git URL
+
+```
+https://github.com/<your-org>/<your-quarkus-app>
+```
+
+> 💬 *"Αυτό είναι το repo μας. Quarkus Java application. Ας δούμε τι καταλαβαίνει το OpenShift..."*
+
+**Pause** — let the console validate and auto-detect the builder image.
+
+> 💬 *"Το είδε. Quarkus / Java. Διάλεξε μόνο του το κατάλληλο builder image."*
+
+---
+
+### 3. Review the auto-populated fields
+
+Show the audience:
+- **Builder Image**: Java / Quarkus (auto-detected)
+- **Application Name**: auto-generated
+- **Resource type**: Deployment (default)
+- **Create a Route**: ✅ checked
+
+> 💬 *"Θα μπορούσαμε να αλλάξουμε οτιδήποτε. Αλλά δεν χρειάζεται. Πατάμε Create."*
+
+---
+
+### 4. Click **Create** — and watch the build
+
+Navigate to: **Developer → Topology** — the app appears with a spinner (building)
+
+Click on the app node → **View Logs** (Build tab)
+
+> 💬 *"Αυτό που βλέπετε είναι ο S2I builder να κατεβάζει dependencies, να κάνει compile, να φτιάχνει το container image. Real time."*
+
+**⏳ Let the build stream. Do not skip this moment. The audience needs to see the logs moving.**
+
+---
+
+### 5. Build completes → Pod starts → Route is live
+
+Back in Topology view:
+- Build pod disappears
+- App pod appears (dark blue ring = running)
+- Route URL appears (top-right arrow icon)
+
+Click the **Route URL** → app opens in browser.
+
+> 💬 *"Αυτό είναι production-ready URL. HTTPS. Load balanced. Από ένα Git URL, σε λίγα λεπτά."*
+
+---
+
+## ⚡ The CLI Equivalent (optional — if time)
+
+```bash
+oc new-app https://github.com/<your-org>/<your-quarkus-app> \
+  --name=my-app \
+  --strategy=source
+
+oc expose svc/my-app
+oc get route my-app
+```
+
+> 💬 *"Ακριβώς το ίδιο — τρεις γραμμές. CI/CD pipeline το κάνει αυτό αυτόματα."*
+
+---
+
+## 📌 Recap
+
+| Έδειξα | Μήνυμα |
+|--------|--------|
+| Import from Git | Το μόνο που χρειάζεται ο developer |
+| Auto-detection | Το platform καταλαβαίνει το framework |
+| Build logs live | Διαφάνεια — ξέρεις τι συμβαίνει |
+| App live in browser | End-to-end σε λεπτά |
+
+---
+
+## ➡️ Next: [Pods / Service / Route](../03-pods-svc-route/README.md)

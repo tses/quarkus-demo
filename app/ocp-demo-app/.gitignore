@@ -1,0 +1,17 @@
+# Maven build output
+target/
+!target/.gitkeep
+
+# IDE files
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Quarkus dev mode
+.quarkus/
+
+# OS files
+.DS_Store
+Thumbs.db
