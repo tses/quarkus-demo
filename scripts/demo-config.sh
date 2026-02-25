@@ -103,6 +103,21 @@ wait_for_pods() {
   ok "Pods are ready"
 }
 
+# Show a command (or YAML block) before executing — gives presenter time to explain
+# Usage:  show_cmd "oc new-app ..."
+show_cmd() {
+  local _B=$'\033[1m' _Y=$'\033[1;33m' _C=$'\033[0;36m' _R=$'\033[0m'
+  printf "\n"
+  printf "%s┌─ Command ────────────────────────────────────────────────────┐%s\n" "${_B}${_Y}" "${_R}"
+  while IFS= read -r line; do
+    printf "%s│%s  %s%s%s\n" "${_B}${_Y}" "${_R}" "${_C}" "${line}" "${_R}"
+  done <<< "$1"
+  printf "%s└──────────────────────────────────────────────────────────────┘%s\n" "${_B}${_Y}" "${_R}"
+  printf "\n"
+  printf "%s[Press ENTER to run ↑]%s " "${_B}" "${_R}"
+  read -r < /dev/tty
+}
+
 # Check oc is logged in
 check_login() {
   if ! oc whoami &>/dev/null; then

@@ -112,4 +112,4 @@ Point out:
 
 ---
 
-## ➡️ Next: [Deployment Strategies](../04-deployment-strategies/README.md)
+## ➡️ Next: [Deployment Strategies](04-deployment-strategies.md)

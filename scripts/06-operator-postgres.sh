@@ -28,6 +28,30 @@ pause
 
 # ── Step 2: Create a PostgresCluster CR ──────────────────────────────────────
 step "Creating a PostgresCluster via YAML..."
+show_cmd "apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: ${DB_CLUSTER_NAME}
+spec:
+  postgresVersion: 16
+  instances:
+    - name: instance1
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+  backups:
+    pgbackrest:
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes: [ReadWriteOnce]
+              resources:
+                requests:
+                  storage: 1Gi"
 # postgresVersion 16 — matches the image digest available in this cluster's
 # operator CSV (postgresoperator.v5.8.6). PGO v5 requires an explicit image:
 # when the version cannot be auto-resolved from the operator environment.
@@ -70,12 +94,11 @@ echo ""
 
 for i in $(seq 1 12); do
   sleep 5
-  RUNNING=$(oc get pods -n "${DEMO_PROJECT}" \
+  PODS=$(oc get pods -n "${DEMO_PROJECT}" \
     -l "postgres-operator.crunchydata.com/cluster=${DB_CLUSTER_NAME}" \
-    --no-headers 2>/dev/null | grep -c "Running" || echo 0)
-  TOTAL=$(oc get pods -n "${DEMO_PROJECT}" \
-    -l "postgres-operator.crunchydata.com/cluster=${DB_CLUSTER_NAME}" \
-    --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    --no-headers 2>/dev/null || true)
+  RUNNING=$(echo "${PODS}" | grep -c "Running" || true)
+  TOTAL=$(echo "${PODS}" | grep -c "." || true)
   echo -e "  [t+$((i*5))s] Postgres pods: ${GREEN}${RUNNING}/${TOTAL} Running${RESET}"
   if [[ "${RUNNING}" -ge 1 ]]; then break; fi
 done

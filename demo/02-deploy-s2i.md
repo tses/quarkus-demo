@@ -1,7 +1,6 @@
-# ACT 2 — Deploy with S2I ⭐ WOW #1
+# ACT 2 — Deploy with S2I
 
 > **Duration:** ~10 minutes  
-> **Wow Factor:** Git URL → Running App. No Dockerfile. No YAML. No ops ticket.  
 > **Message:** *"Ο developer δίνει κώδικα. Το platform κάνει τα υπόλοιπα."*
 
 ---
@@ -29,22 +28,24 @@ Navigate to: **Developer → +Add → Import from Git**
 ### 2. Paste the Git URL
 
 ```
-https://github.com/<your-org>/<your-quarkus-app>
+https://github.com/tses/quarkus-demo
 ```
+
+Sub-directory (context dir): `app/ocp-demo-app`
 
 > 💬 *"Αυτό είναι το repo μας. Quarkus Java application. Ας δούμε τι καταλαβαίνει το OpenShift..."*
 
 **Pause** — let the console validate and auto-detect the builder image.
 
-> 💬 *"Το είδε. Quarkus / Java. Διάλεξε μόνο του το κατάλληλο builder image."*
+> 💬 *"Το είδε. Java 17. Διάλεξε μόνο του το κατάλληλο builder image."*
 
 ---
 
 ### 3. Review the auto-populated fields
 
 Show the audience:
-- **Builder Image**: Java / Quarkus (auto-detected)
-- **Application Name**: auto-generated
+- **Builder Image**: `java:openjdk-17-ubi8` (auto-detected)
+- **Application Name**: `ocp-demo-app`
 - **Resource type**: Deployment (default)
 - **Create a Route**: ✅ checked
 
@@ -71,24 +72,41 @@ Back in Topology view:
 - App pod appears (dark blue ring = running)
 - Route URL appears (top-right arrow icon)
 
-Click the **Route URL** → app opens in browser.
+Click the **Route URL** → app opens in browser at `/api/info`.
 
 > 💬 *"Αυτό είναι production-ready URL. HTTPS. Load balanced. Από ένα Git URL, σε λίγα λεπτά."*
 
 ---
 
-## ⚡ The CLI Equivalent (optional — if time)
+## ⚡ The CLI Equivalent (script: `scripts/02-deploy-s2i.sh`)
 
 ```bash
-oc new-app https://github.com/<your-org>/<your-quarkus-app> \
-  --name=my-app \
-  --strategy=source
+oc new-app \
+  -i openshift/java:openjdk-17-ubi8 \
+  --code=https://github.com/tses/quarkus-demo \
+  --context-dir=app/ocp-demo-app \
+  --name=ocp-demo-app \
+  --labels=app=ocp-demo-app,demo=ocp-intro \
+  -n ocp-demo
 
-oc expose svc/my-app
-oc get route my-app
+oc logs -f bc/ocp-demo-app -n ocp-demo
+
+oc expose svc/ocp-demo-app -n ocp-demo
 ```
 
-> 💬 *"Ακριβώς το ίδιο — τρεις γραμμές. CI/CD pipeline το κάνει αυτό αυτόματα."*
+> 💬 *"Ακριβώς το ίδιο — τρεις εντολές. CI/CD pipeline το κάνει αυτό αυτόματα."*
+
+---
+
+## 🔗 App Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/info` | hostname (pod name), version, colour |
+| `GET /api/burn?seconds=30` | CPU stress → triggers HPA |
+| `GET /q/health` | liveness + readiness probes |
+| `GET /q/metrics` | Prometheus metrics (Micrometer) |
+| `GET /swagger-ui` | OpenAPI UI |
 
 ---
 
@@ -103,4 +121,4 @@ oc get route my-app
 
 ---
 
-## ➡️ Next: [Pods / Service / Route](../03-pods-svc-route/README.md)
+## ➡️ Next: [Pods / Service / Route](03-pods-svc-route.md)

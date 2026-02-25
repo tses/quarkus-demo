@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 02-deploy-s2i.sh — WOW #1: Deploy Quarkus app from Git using S2I
+# 02-deploy-s2i.sh — Deploy Quarkus app from Git using S2I
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
 
-header "ACT 2 — Deploy with S2I ⭐ WOW #1"
+header "ACT 2 — Deploy with S2I"
 
 check_login
 use_project
@@ -15,21 +15,26 @@ step "App source: ${GIT_REPO} (context: ${GIT_CONTEXT_DIR})"
 echo ""
 echo -e "  ${BOLD}Git URL   :${RESET} ${CYAN}${GIT_REPO}${RESET}"
 echo -e "  ${BOLD}Sub-dir   :${RESET} ${CYAN}${GIT_CONTEXT_DIR}${RESET}"
-echo -e "  ${BOLD}Framework :${RESET} Quarkus (Java 21, RESTEasy Reactive)"
+echo -e "  ${BOLD}Framework :${RESET} Quarkus (Java 17, RESTEasy Reactive)"
 echo ""
 echo -e "  ${BOLD}Endpoints :${RESET}"
-echo -e "    ${CYAN}GET /api/info${RESET}           — hostname (pod name), version, colour"
-echo -e "    ${CYAN}GET /api/items${RESET}          — CRUD (persisted to Postgres)"
+echo -e "    ${CYAN}GET /api/info${RESET}            — hostname (pod name), version, colour"
 echo -e "    ${CYAN}GET /api/burn?seconds=30${RESET} — CPU stress → triggers HPA"
-echo -e "    ${CYAN}GET /q/health${RESET}           — liveness + readiness probes"
-echo -e "    ${CYAN}GET /q/metrics${RESET}          — Prometheus metrics"
-echo -e "    ${CYAN}GET /swagger-ui${RESET}         — OpenAPI UI"
+echo -e "    ${CYAN}GET /q/health${RESET}            — liveness + readiness probes"
+echo -e "    ${CYAN}GET /q/metrics${RESET}           — Prometheus metrics"
+echo -e "    ${CYAN}GET /swagger-ui${RESET}          — OpenAPI UI"
 echo ""
 pause
 
 # ── Step 2: new-app from source ───────────────────────────────────────────────
 step "Running: oc new-app (S2I from Git)..."
-echo ""
+show_cmd "oc new-app
+  -i openshift/${BUILDER_IMAGE}
+  --code=${GIT_REPO}
+  --context-dir=${GIT_CONTEXT_DIR}
+  --name=${APP_NAME}
+  --labels=app=${APP_NAME},demo=ocp-intro
+  -n ${DEMO_PROJECT}"
 oc new-app \
   -i "openshift/${BUILDER_IMAGE}" \
   --code="${GIT_REPO}" \
@@ -41,9 +46,10 @@ oc new-app \
 ok "Build triggered! Watching build logs..."
 echo ""
 
-# ── Step 3: Tail build logs (the dramatic moment) ─────────────────────────────
-step "Build logs (S2I in action — this is the magic):"
-echo ""
+# ── Step 3: Tail build logs ───────────────────────────────────────────────────
+step "Build logs (S2I compiling and packaging the app):"
+show_cmd "oc logs -f bc/${APP_NAME}
+  -n ${DEMO_PROJECT}"
 # Wait a moment for the build pod to start
 sleep 5
 oc logs -f "bc/${APP_NAME}" -n "${DEMO_PROJECT}" || \
@@ -57,6 +63,8 @@ pause
 
 # ── Step 4: Expose the service ────────────────────────────────────────────────
 step "Exposing service as HTTPS Route..."
+show_cmd "oc expose svc/${APP_NAME}
+  -n ${DEMO_PROJECT}"
 oc expose svc/"${APP_NAME}" -n "${DEMO_PROJECT}" 2>/dev/null || true
 
 # Get the route URL

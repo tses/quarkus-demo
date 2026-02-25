@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 09-self-healing.sh — WOW #3: Kill a pod — watch it come back automatically
-# THE MOST DRAMATIC MOMENT OF THE DEMO — pace yourself!
+# 09-self-healing.sh — Kill a pod — watch it come back automatically
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
 
-header "ACT 3 — Self-Healing Pods ⭐ WOW #3"
+header "ACT 3 — Self-Healing Pods"
 
 check_login
 use_project
 
-# ── Step 1: Scale to 3 so the kill is dramatic ───────────────────────────────
-step "Scaling to 3 replicas for maximum visual effect..."
+# ── Step 1: Scale to 3 replicas ──────────────────────────────────────────────
+step "Scaling to 3 replicas..."
+show_cmd "oc scale deployment/${APP_NAME} --replicas=3 -n ${DEMO_PROJECT}"
 oc scale deployment/"${APP_NAME}" --replicas=3 -n "${DEMO_PROJECT}"
 wait_for_deployment "${APP_NAME}"
 echo ""
@@ -44,6 +44,7 @@ echo -e "${YELLOW}  → Switch to Console Topology view NOW ←${RESET}"
 echo ""
 sleep 2
 
+show_cmd "oc delete pod ${POD_TO_KILL} -n ${DEMO_PROJECT}"
 oc delete pod "${POD_TO_KILL}" -n "${DEMO_PROJECT}"
 
 echo ""
@@ -98,9 +99,9 @@ echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━
 echo -e "${BOLD}${CYAN}  DEMO COMPLETE${RESET}"
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
-echo -e "  ${BOLD}⭐ WOW #1:${RESET} Git URL → Live HTTPS App          (S2I)"
-echo -e "  ${BOLD}⭐ WOW #2:${RESET} Canary release with traffic slider (Route weights)"
-echo -e "  ${BOLD}⭐ WOW #3:${RESET} Pod killed → auto-replaced          (Self-healing)"
+echo -e "  ${BOLD}1.${RESET} Git URL → Live HTTPS App          (S2I)"
+echo -e "  ${BOLD}2.${RESET} Canary release with traffic slider (Route weights)"
+echo -e "  ${BOLD}3.${RESET} Pod killed → auto-replaced          (Self-healing)"
 echo ""
 echo -e "  ${YELLOW}All of this ran on a standard OpenShift cluster.${RESET}"
 echo -e "  ${YELLOW}No custom tooling. No Dockerfile. No YAML written from scratch.${RESET}"

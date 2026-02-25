@@ -12,6 +12,17 @@ use_project
 
 # ── Step 1: Show current strategy ─────────────────────────────────────────────
 step "Current deployment strategy:"
+echo ""
+echo -e "${CYAN}  RollingUpdate parameters:${RESET}"
+echo -e "${CYAN}    maxSurge: 25%${RESET}        — how many EXTRA pods OpenShift can create above the"
+echo -e "${CYAN}                    ${RESET}        desired count during the update."
+echo -e "${CYAN}                    ${RESET}        (e.g. 4 replicas → up to 5 pods running at once)"
+echo -e "${CYAN}    maxUnavailable: 25%${RESET}  — how many pods can be unavailable at the same time."
+echo -e "${CYAN}                    ${RESET}        (e.g. 4 replicas → at least 3 always serving traffic)"
+echo ""
+echo -e "${CYAN}  Together they guarantee zero-downtime: new pods come up BEFORE old ones go down.${RESET}"
+echo ""
+pause
 oc get deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
   -o jsonpath='Strategy: {.spec.strategy.type}{"\n"}MaxSurge: {.spec.strategy.rollingUpdate.maxSurge}{"\n"}MaxUnavailable: {.spec.strategy.rollingUpdate.maxUnavailable}{"\n"}'
 echo ""
@@ -28,10 +39,14 @@ step "Triggering a new rollout (simulating a new image deploy)..."
 echo -e "${YELLOW}  Watch the Topology view in the Console — pods will cycle${RESET}"
 echo ""
 
-# Inject a new env var to force a new rollout revision
+# Inject APP_VERSION env var — MicroProfile maps app.version → APP_VERSION
+# so /api/info will show the updated version value live
 DEMO_VER="v$(date +%s)"
+show_cmd "oc set env deployment/${APP_NAME}
+  APP_VERSION=${DEMO_VER}
+  -n ${DEMO_PROJECT}"
 oc set env deployment/"${APP_NAME}" \
-  DEMO_VERSION="${DEMO_VER}" \
+  APP_VERSION="${DEMO_VER}" \
   -n "${DEMO_PROJECT}"
 
 # Annotate so rollout history shows a meaningful CHANGE-CAUSE
@@ -55,6 +70,8 @@ pause
 
 # ── Step 5: Rollback ──────────────────────────────────────────────────────────
 step "Rolling BACK to previous version (one command)..."
+show_cmd "oc rollout undo deployment/${APP_NAME}
+  -n ${DEMO_PROJECT}"
 oc rollout undo deployment/"${APP_NAME}" -n "${DEMO_PROJECT}"
 oc rollout status deployment/"${APP_NAME}" -n "${DEMO_PROJECT}" --timeout=120s
 echo ""

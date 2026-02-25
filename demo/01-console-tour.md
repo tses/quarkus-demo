@@ -81,4 +81,4 @@ oc get nodes
 
 ---
 
-## ➡️ Next: [Deploy with S2I](../02-deploy-s2i/README.md)
+## ➡️ Next: [Deploy with S2I](02-deploy-s2i.md)

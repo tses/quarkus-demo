@@ -252,4 +252,4 @@ oc get resourcequota,limitrange -n ocp-demo
 
 ---
 
-## ➡️ Next: [Scaling Out](../08-scaling/README.md)
+## ➡️ Next: [Scaling Out](08-scaling.md)

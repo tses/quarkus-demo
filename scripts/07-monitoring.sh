@@ -52,24 +52,20 @@ pause
 
 # ── Apply ServiceMonitor ──────────────────────────────────────────────────────
 step "Applying ServiceMonitor — tells Prometheus WHERE to scrape our app:"
-echo ""
-cat <<'YAML'
-  apiVersion: monitoring.coreos.com/v1
-  kind: ServiceMonitor
-  metadata:
-    name: ocp-demo-app
-    labels:
-      app: ocp-demo-app
-  spec:
-    selector:
-      matchLabels:
-        app: ocp-demo-app
-    endpoints:
-      - port: 8080-tcp      # the Service port name
-        path: /q/metrics
-        interval: 15s
-YAML
-echo ""
+show_cmd "apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+spec:
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  endpoints:
+    - port: 8080-tcp
+      path: /q/metrics
+      interval: 15s"
 
 oc apply -n "${DEMO_PROJECT}" -f - <<EOF
 apiVersion: monitoring.coreos.com/v1
@@ -153,25 +149,11 @@ pause
 
 # ── Patch probes onto the deployment ─────────────────────────────────────────
 step "Patching liveness + readiness probes onto deployment/${APP_NAME}:"
-echo ""
-cat <<'YAML'
-  livenessProbe:
-    httpGet:
-      path: /q/health/live
-      port: 8080
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    failureThreshold: 3
-
-  readinessProbe:
-    httpGet:
-      path: /q/health/ready
-      port: 8080
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    failureThreshold: 3
-YAML
-echo ""
+show_cmd "oc set probe deployment/${APP_NAME} -n ${DEMO_PROJECT}
+  --liveness  --get-url=http://:8080/q/health/live
+              --initial-delay-seconds=10 --period-seconds=10
+  --readiness --get-url=http://:8080/q/health/ready
+              --initial-delay-seconds=5  --period-seconds=5"
 
 oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=json \
@@ -212,7 +194,7 @@ echo ""
 echo -e "  ${YELLOW}→ Console: Workloads → Deployments → ${APP_NAME} → YAML — scroll to livenessProbe${RESET}"
 echo ""
 
-# ── Dramatic: show what a failing probe looks like (describe) ─────────────────
+# ── Show what a failing probe looks like (describe) ──────────────────────────
 step "What a failing liveness probe looks like:"
 cat <<'MSG'
   Events from a pod where liveness fails:
@@ -264,17 +246,9 @@ pause
 
 # ── Apply resource requests + limits ─────────────────────────────────────────
 step "Patching resource requests + limits onto deployment/${APP_NAME}:"
-echo ""
-cat <<'YAML'
-  resources:
-    requests:
-      cpu: "100m"      # 0.1 core guaranteed
-      memory: "256Mi"  # 256 MiB guaranteed
-    limits:
-      cpu: "500m"      # 0.5 core maximum
-      memory: "512Mi"  # 512 MiB maximum — OOMKill above this
-YAML
-echo ""
+show_cmd "oc set resources deployment/${APP_NAME} -n ${DEMO_PROJECT}
+  --requests=cpu=100m,memory=256Mi
+  --limits=cpu=500m,memory=512Mi"
 
 oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=json \

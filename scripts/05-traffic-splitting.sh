@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 05-traffic-splitting.sh — WOW #2: Canary release with traffic weights
+# 05-traffic-splitting.sh — Canary release with traffic weights
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
 
-header "ACT 3 — Traffic Splitting ⭐ WOW #2"
+header "ACT 3 — Traffic Splitting"
 
 check_login
 use_project
@@ -21,6 +21,13 @@ step "Deploying v2 of the app (new colour/label to identify responses)..."
 echo ""
 
 # Deploy v2 using the same builder image — explicit to avoid auto-detect errors
+show_cmd "oc new-app
+  -i openshift/${BUILDER_IMAGE}
+  --code=${GIT_REPO}
+  --context-dir=${GIT_CONTEXT_DIR}
+  --name=${APP_NAME_V2}
+  --labels=app=${APP_NAME_V2},demo=ocp-intro,version=v2
+  -n ${DEMO_PROJECT}"
 oc new-app \
   -i "openshift/${BUILDER_IMAGE}" \
   --code="${GIT_REPO}" \
@@ -65,6 +72,13 @@ pause
 
 # ── Step 3: Split 90/10 ───────────────────────────────────────────────────────
 step "Setting traffic split: 90% → v1, 10% → v2"
+show_cmd "oc patch route ${APP_NAME} -n ${DEMO_PROJECT}
+  --type=merge -p '{
+    \"spec\": {
+      \"to\": {\"name\": \"${APP_NAME}\", \"weight\": 90},
+      \"alternateBackends\": [{\"name\": \"${APP_NAME_V2}\", \"weight\": 10}]
+    }
+  }'"
 oc patch route "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=merge \
   -p "{
@@ -90,10 +104,10 @@ for i in $(seq 1 20); do
   RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response")
   if [[ "${RESP}" == *'"colour":"green"'* ]] || [[ "${RESP}" == *'"colour": "green"'* ]]; then
     echo -e "  Request ${i}: ${YELLOW}${BOLD}${RESP}${RESET}  ← v2 (green)"
-    ((V2_COUNT++))
+    V2_COUNT=$((V2_COUNT + 1))
   else
     echo -e "  Request ${i}: ${CYAN}${RESP}${RESET}  ← v1 (blue)"
-    ((V1_COUNT++))
+    V1_COUNT=$((V1_COUNT + 1))
   fi
 done
 echo ""
@@ -102,6 +116,13 @@ pause
 
 # ── Step 4: Move to 50/50 ────────────────────────────────────────────────────
 step "Increasing v2 traffic to 50%..."
+show_cmd "oc patch route ${APP_NAME} -n ${DEMO_PROJECT}
+  --type=merge -p '{
+    \"spec\": {
+      \"to\": {\"name\": \"${APP_NAME}\", \"weight\": 50},
+      \"alternateBackends\": [{\"name\": \"${APP_NAME_V2}\", \"weight\": 50}]
+    }
+  }'"
 oc patch route "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=merge \
   -p "{
@@ -126,6 +147,13 @@ pause
 
 # ── Step 5: Full cutover to v2 ───────────────────────────────────────────────
 step "All good — cutting over 100% to v2!"
+show_cmd "oc patch route ${APP_NAME} -n ${DEMO_PROJECT}
+  --type=merge -p '{
+    \"spec\": {
+      \"to\": {\"name\": \"${APP_NAME_V2}\", \"weight\": 100},
+      \"alternateBackends\": []
+    }
+  }'"
 oc patch route "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=merge \
   -p "{
@@ -147,6 +175,13 @@ pause
 
 # ── Step 6 (optional): Emergency rollback ────────────────────────────────────
 step "Emergency rollback demo (back to v1 instantly):"
+show_cmd "oc patch route ${APP_NAME} -n ${DEMO_PROJECT}
+  --type=merge -p '{
+    \"spec\": {
+      \"to\": {\"name\": \"${APP_NAME}\", \"weight\": 100},
+      \"alternateBackends\": []
+    }
+  }'"
 oc patch route "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=merge \
   -p "{
@@ -161,3 +196,13 @@ RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response"
 echo -e "  Verify (colour should be blue): ${CYAN}${RESP}${RESET}"
 echo ""
 ok "Traffic splitting demo complete. ⭐"
+pause
+
+# ── Cleanup: remove v2 so it doesn't interfere with later demos ──────────────
+step "Cleaning up v2 resources..."
+show_cmd "oc delete deployment,svc,bc,is ${APP_NAME_V2} -n ${DEMO_PROJECT} --ignore-not-found"
+oc delete deployment "${APP_NAME_V2}" -n "${DEMO_PROJECT}" --ignore-not-found 2>/dev/null || true
+oc delete svc         "${APP_NAME_V2}" -n "${DEMO_PROJECT}" --ignore-not-found 2>/dev/null || true
+oc delete bc          "${APP_NAME_V2}" -n "${DEMO_PROJECT}" --ignore-not-found 2>/dev/null || true
+oc delete is          "${APP_NAME_V2}" -n "${DEMO_PROJECT}" --ignore-not-found 2>/dev/null || true
+ok "v2 removed — cluster is clean for the next demo."
