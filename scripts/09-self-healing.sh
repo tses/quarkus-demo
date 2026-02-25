@@ -86,7 +86,7 @@ ROUTE_URL=$(oc get route "${APP_NAME}" -n "${DEMO_PROJECT}" -o jsonpath='{.spec.
 if [[ -n "${ROUTE_URL}" ]]; then
   step "App is still responding (no downtime experienced by users):"
   for i in $(seq 1 3); do
-    RESP=$(curl -sf "http://${ROUTE_URL}/hello" 2>/dev/null || echo "no response")
+    RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response")
     echo -e "  Request ${i}: ${GREEN}${RESP}${RESET}"
   done
 fi

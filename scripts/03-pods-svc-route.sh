@@ -57,14 +57,14 @@ oc get route "${APP_NAME}" -n "${DEMO_PROJECT}"
 echo ""
 
 ROUTE_URL=$(oc get route "${APP_NAME}" -n "${DEMO_PROJECT}" -o jsonpath='{.spec.host}')
-echo -e "  ${BOLD}Public URL :${RESET} ${CYAN}http://${ROUTE_URL}/hello${RESET}"
+echo -e "  ${BOLD}Public URL :${RESET} ${CYAN}http://${ROUTE_URL}/api/info${RESET}"
 echo -e "  ${BOLD}TLS        :${RESET} Edge terminated (HTTPS available)"
 echo ""
 
 # Live curl to the route
 step "Calling the app via Route:"
 for i in 1 2 3; do
-  RESP=$(curl -sf "http://${ROUTE_URL}/hello" 2>/dev/null || echo "no response")
+  RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response")
   echo -e "  Request ${i}: ${GREEN}${RESP}${RESET}"
 done
 echo ""

@@ -29,8 +29,15 @@ echo -e "${YELLOW}  Watch the Topology view in the Console — pods will cycle${
 echo ""
 
 # Inject a new env var to force a new rollout revision
+DEMO_VER="v$(date +%s)"
 oc set env deployment/"${APP_NAME}" \
-  DEMO_VERSION="v$(date +%s)" \
+  DEMO_VERSION="${DEMO_VER}" \
+  -n "${DEMO_PROJECT}"
+
+# Annotate so rollout history shows a meaningful CHANGE-CAUSE
+oc annotate deployment/"${APP_NAME}" \
+  kubernetes.io/change-cause="demo rollout ${DEMO_VER}" \
+  --overwrite \
   -n "${DEMO_PROJECT}"
 
 echo ""
