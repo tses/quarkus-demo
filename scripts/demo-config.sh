@@ -26,11 +26,11 @@ export DEMO_PROJECT_DISPLAY="OCP Introduction Demo"
 # -----------------------------------------------------------------------------
 export APP_NAME="ocp-demo-app"
 export APP_NAME_V2="ocp-demo-app-v2"
-export GIT_REPO="https://github.com/tsesmelisi/KED-OCP-Training"   # ← update to your fork
+export GIT_REPO="https://github.com/tses/quarkus-demo"   # ← update to your fork
 export GIT_CONTEXT_DIR="app/ocp-demo-app"
 export GIT_REF_V1="main"
 export GIT_REF_V2="main"                      # same repo, patch APP_COLOUR=green for v2
-export BUILDER_IMAGE="java:openjdk-21-ubi8"   # java imagestream in openshift namespace
+export BUILDER_IMAGE="java:openjdk-17-ubi8"   # java imagestream in openshift namespace
 
 # -----------------------------------------------------------------------------
 # DATABASE (Postgres Operator)
