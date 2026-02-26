@@ -110,4 +110,4 @@ strategy:
 
 ---
 
-## ➡️ Next: [Traffic Splitting](05-traffic-splitting.md)
+## ⬅️ Previous: [Pods / Service / Route](03-pods-svc-route.md) | ➡️ Next: [Traffic Splitting](05-traffic-splitting.md)

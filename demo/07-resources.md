@@ -158,4 +158,4 @@ oc get resourcequota,limitrange -n ocp-demo
 
 ---
 
-## ➡️ Next: [Health Probes](08-probes.md)
+## ⬅️ Previous: [Deploy Postgres Operator](06-operator-postgres.md) | ➡️ Next: [Health Probes](08-probes.md)

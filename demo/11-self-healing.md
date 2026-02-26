@@ -117,6 +117,10 @@ curl http://<route>/api/info   # returns 200 — application was never unavailab
 
 ---
 
+## ⬅️ Previous: [Scaling Out](10-scaling.md)
+
+---
+
 ## End of Demo
 
 Suggested follow-up resources:

@@ -108,4 +108,4 @@ The deployment is reset to 3 replicas as the starting state for the self-healing
 
 ---
 
-## ➡️ Next: [Self-Healing Pods](11-self-healing.md)
+## ⬅️ Previous: [Monitoring — ServiceMonitor](09-monitoring.md) | ➡️ Next: [Self-Healing Pods](11-self-healing.md)

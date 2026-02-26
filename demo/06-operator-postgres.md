@@ -130,4 +130,4 @@ oc get secret demo-db-pguser-demo-db -n ocp-demo \
 
 ---
 
-## ➡️ Next: [Resource Requests & Limits](07-resources.md)
+## ⬅️ Previous: [Traffic Splitting](05-traffic-splitting.md) | ➡️ Next: [Resource Requests & Limits](07-resources.md)

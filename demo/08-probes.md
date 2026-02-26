@@ -152,4 +152,4 @@ oc describe pod <pod-name> -n ocp-demo
 
 ---
 
-## ➡️ Next: [Monitoring — ServiceMonitor](09-monitoring.md)
+## ⬅️ Previous: [Resource Requests & Limits](07-resources.md) | ➡️ Next: [Monitoring — ServiceMonitor](09-monitoring.md)

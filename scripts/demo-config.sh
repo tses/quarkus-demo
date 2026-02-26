@@ -35,10 +35,11 @@ export GIT_REF_V2="main"                      # same repo, patch APP_COLOUR=gree
 export BUILDER_IMAGE="java:openjdk-17-ubi8"   # java imagestream in openshift namespace
 
 # -----------------------------------------------------------------------------
-# DATABASE (Postgres Operator)
+# DATABASE (Postgres Operator) — lives in its OWN namespace (separate from app)
 # -----------------------------------------------------------------------------
 export DB_CLUSTER_NAME="demo-db"
-export DB_NAMESPACE="${DEMO_PROJECT}"
+export DB_NAMESPACE="ocp-demo-db"
+export DB_NAMESPACE_DISPLAY="OCP Demo Database"
 
 # -----------------------------------------------------------------------------
 # COLORS — for pretty terminal output during demo

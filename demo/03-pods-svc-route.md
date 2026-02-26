@@ -109,4 +109,4 @@ Key fields:
 
 ---
 
-## ➡️ Next: [Deployment Strategies](04-deployment-strategies.md)
+## ⬅️ Previous: [Deploy with S2I](02-deploy-s2i.md) | ➡️ Next: [Deployment Strategies](04-deployment-strategies.md)

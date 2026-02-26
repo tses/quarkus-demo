@@ -12,6 +12,13 @@ header "ACT 3 — Postgres Operator (CLI verification)"
 check_login
 use_project
 
+# ── Ensure the DB namespace exists ───────────────────────────────────────────
+step "Ensuring database namespace '${DB_NAMESPACE}' exists..."
+oc project "${DB_NAMESPACE}" &>/dev/null || \
+  oc new-project "${DB_NAMESPACE}" --display-name="${DB_NAMESPACE_DISPLAY}"
+ok "Using database namespace: ${DB_NAMESPACE}"
+echo ""
+
 echo -e "${YELLOW}  ℹ  Install the Postgres Operator via Console first:${RESET}"
 echo -e "     Administrator → Operators → OperatorHub → search 'PostgreSQL'${RESET}"
 echo -e "     Install 'Crunchy Postgres for Kubernetes' → then return here.${RESET}"
@@ -20,7 +27,7 @@ pause
 
 # ── Step 1: Verify operator is installed ─────────────────────────────────────
 step "Checking installed operators..."
-oc get csv -n "${DEMO_PROJECT}" 2>/dev/null | grep -i postgres || \
+oc get csv -n "${DB_NAMESPACE}" 2>/dev/null | grep -i postgres || \
   oc get csv -A 2>/dev/null | grep -i postgres || \
   warn "No Postgres operator found — install from OperatorHub first"
 echo ""
@@ -55,7 +62,7 @@ spec:
 # postgresVersion 16 — matches the image digest available in this cluster's
 # operator CSV (postgresoperator.v5.8.6). PGO v5 requires an explicit image:
 # when the version cannot be auto-resolved from the operator environment.
-cat << EOF | oc apply -n "${DEMO_PROJECT}" -f -
+cat << EOF | oc apply -n "${DB_NAMESPACE}" -f -
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:
@@ -85,16 +92,16 @@ spec:
                   storage: 1Gi
 EOF
 echo ""
-ok "PostgresCluster '${DB_CLUSTER_NAME}' created"
+ok "PostgresCluster '${DB_CLUSTER_NAME}' created in namespace '${DB_NAMESPACE}'"
 
 # ── Step 3: Watch it come up ──────────────────────────────────────────────────
-step "Watching Postgres pods appear (this takes ~60s)..."
+step "Watching Postgres pods appear in '${DB_NAMESPACE}' (this takes ~60s)..."
 echo -e "${YELLOW}  Switch to Topology view to see pods appear visually${RESET}"
 echo ""
 
 for i in $(seq 1 12); do
   sleep 5
-  PODS=$(oc get pods -n "${DEMO_PROJECT}" \
+  PODS=$(oc get pods -n "${DB_NAMESPACE}" \
     -l "postgres-operator.crunchydata.com/cluster=${DB_CLUSTER_NAME}" \
     --no-headers 2>/dev/null || true)
   RUNNING=$(echo "${PODS}" | grep -c "Running" || true)
@@ -105,16 +112,16 @@ done
 echo ""
 
 # ── Step 4: Show auto-created secrets ────────────────────────────────────────
-step "Secrets auto-created by the Operator:"
-oc get secrets -n "${DEMO_PROJECT}" | grep "${DB_CLUSTER_NAME}" || \
+step "Secrets auto-created by the Operator (namespace: ${DB_NAMESPACE}):"
+oc get secrets -n "${DB_NAMESPACE}" | grep "${DB_CLUSTER_NAME}" || \
   echo "  (secrets not yet created — cluster may still be initializing)"
 echo ""
 
 # ── Step 5: Show connection string ───────────────────────────────────────────
 step "Connection secret (your app uses this — no one hard-codes passwords):"
 SECRET_NAME="${DB_CLUSTER_NAME}-pguser-${DB_CLUSTER_NAME}"
-if oc get secret "${SECRET_NAME}" -n "${DEMO_PROJECT}" &>/dev/null; then
-  oc get secret "${SECRET_NAME}" -n "${DEMO_PROJECT}" \
+if oc get secret "${SECRET_NAME}" -n "${DB_NAMESPACE}" &>/dev/null; then
+  oc get secret "${SECRET_NAME}" -n "${DB_NAMESPACE}" \
     -o jsonpath='{.data.uri}' | base64 -d
   echo ""
 else

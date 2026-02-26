@@ -119,4 +119,4 @@ oc expose svc/ocp-demo-app -n ocp-demo
 
 ---
 
-## ➡️ Next: [Pods / Service / Route](03-pods-svc-route.md)
+## ⬅️ Previous: [Console Tour](01-console-tour.md) | ➡️ Next: [Pods / Service / Route](03-pods-svc-route.md)

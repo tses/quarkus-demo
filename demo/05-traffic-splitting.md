@@ -131,4 +131,4 @@ v2 resources are removed to avoid interfering with subsequent steps.
 
 ---
 
-## ➡️ Next: [Deploy Postgres Operator](06-operator-postgres.md)
+## ⬅️ Previous: [Deployment Strategies](04-deployment-strategies.md) | ➡️ Next: [Deploy Postgres Operator](06-operator-postgres.md)

@@ -126,4 +126,4 @@ oc get servicemonitor ocp-demo-app -n ocp-demo -o yaml
 
 ---
 
-## ➡️ Next: [Scaling Out](10-scaling.md)
+## ⬅️ Previous: [Health Probes](08-probes.md) | ➡️ Next: [Scaling Out](10-scaling.md)
