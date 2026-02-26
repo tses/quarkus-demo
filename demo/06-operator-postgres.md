@@ -132,4 +132,4 @@ oc get secret demo-db-pguser-demo-db -n ocp-demo \
 
 ---
 
-## ➡️ Next: [Monitoring](07-monitoring.md)
+## ➡️ Next: [Resource Requests & Limits](07-resources.md)

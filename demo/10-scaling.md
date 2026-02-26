@@ -1,6 +1,6 @@
 # ACT 3 — Scaling Out
 
-> **Script:** `scripts/08-scaling.sh`
+> **Script:** `scripts/10-scaling.sh`
 > **Goal:** Demonstrate manual horizontal scaling and Horizontal Pod Autoscaler (HPA) reacting to real CPU load.
 
 ---
@@ -108,4 +108,4 @@ The deployment is reset to 3 replicas as the starting state for the self-healing
 
 ---
 
-## ➡️ Next: [Self-Healing Pods](09-self-healing.md)
+## ➡️ Next: [Self-Healing Pods](11-self-healing.md)

@@ -1,6 +1,6 @@
 # ACT 3 — Self-Healing Pods
 
-> **Script:** `scripts/09-self-healing.sh`
+> **Script:** `scripts/11-self-healing.sh`
 > **Goal:** Demonstrate the Kubernetes reconciliation loop — the platform detects a missing pod and replaces it automatically, with no manual intervention.
 
 ---

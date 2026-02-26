@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 09-self-healing.sh — Kill a pod — watch it come back automatically
+# 11-self-healing.sh — Kill a pod — watch it come back automatically
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"

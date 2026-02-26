@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 08-scaling.sh — Manual scale + HPA auto-scaling demo
+# 10-scaling.sh — Manual scale + HPA auto-scaling demo
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
