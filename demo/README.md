@@ -9,9 +9,9 @@
 
 ## Demo Narrative
 
-> *"From a Git URL to a production-grade, self-healing, observable, zero-downtime-deployable application — in under 10 minutes. The remaining time shows what the platform does for you after that."*
+> *"From a Git URL to a production-grade, self-healing, observable, zero-downtime-deployable application — in under 10 minutes. The remaining time covers what the platform provides after that."*
 
-Each step has a deliberate technical message. Maintain pace discipline — allow the audience time to register each point before advancing.
+Each step carries a deliberate technical message. Maintain pace discipline — allow the audience time to register each point before advancing.
 
 ---
 
@@ -19,7 +19,7 @@ Each step has a deliberate technical message. Maintain pace discipline — allow
 
 | Act | Theme | Message |
 |---|---|---|
-| **ACT 1** | Orientation | The platform has a structured cockpit — distinct views for developers and administrators |
+| **ACT 1** | Orientation | OpenShift 4.20 provides a unified console with distinct views for developers and administrators |
 | **ACT 2** | Build & Deploy | Source code to running application — no Dockerfile, no YAML, no infrastructure ticket |
 | **ACT 3** | Platform Capabilities | Production features that would require months of custom tooling — built in and operational by default |
 

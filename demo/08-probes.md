@@ -1,7 +1,7 @@
 # ACT 3 — Liveness & Readiness Probes
 
 > **Script:** `scripts/08-probes.sh`
-> **Goal:** Understand the two probe types, their distinct failure actions, and how to configure them correctly.
+> **Overview:** OpenShift uses two probe types with distinct failure actions to manage container health and traffic routing automatically.
 
 ---
 
@@ -36,7 +36,7 @@ class AppReadiness implements HealthCheck { ... }  // → /q/health/ready
 
 ## Steps
 
-### 1. Show state without probes
+### 1. State Without Probes
 
 ```bash
 oc get deployment ocp-demo-app \
@@ -44,11 +44,11 @@ oc get deployment ocp-demo-app \
 # → empty — pod is marked Ready as soon as the container process starts
 ```
 
-> **Gotcha:** Without a readiness probe, traffic arrives as soon as the container starts — even if the JVM hasn't finished initialising. The first few requests get connection-refused errors.
+> **Note:** Without a readiness probe, traffic arrives as soon as the container starts — even if the JVM hasn't finished initialising. The first few requests receive connection-refused errors.
 
 ---
 
-### 2. Probe configuration
+### 2. Probe Configuration
 
 ```yaml
 livenessProbe:
@@ -68,7 +68,7 @@ readinessProbe:
   failureThreshold: 3       # 3 consecutive failures → remove from Service
 ```
 
-> **Gotcha:** `initialDelaySeconds` must cover JVM startup. Set it too low and the pod enters a restart loop before the application has started — a common misconfiguration.
+> **Note:** `initialDelaySeconds` must cover JVM startup. Setting it too low causes the pod to enter a restart loop before the application has started — a common misconfiguration.
 
 ```bash
 oc get deployment ocp-demo-app \
@@ -81,7 +81,7 @@ oc get deployment ocp-demo-app \
 
 ---
 
-### 3. What probe failures look like
+### 3. Probe Failure Behaviour
 
 **Readiness failure** (`oc get pods` + `oc get events`):
 
@@ -114,7 +114,7 @@ Key differences:
 | Traffic | Stopped | Stopped (during restart) |
 | Recovery | Automatic when probe passes | Automatic **if** the root cause is fixed |
 
-> **Gotcha:** A liveness probe that fires too aggressively (low `initialDelaySeconds`, low `failureThreshold`) will restart a healthy app that simply hasn't warmed up yet — causing CrashLoopBackOff on a perfectly good image.
+> **Note:** A liveness probe configured with a low `initialDelaySeconds` and low `failureThreshold` will restart a healthy app that simply hasn't warmed up yet — causing CrashLoopBackOff on a perfectly good image.
 
 > **CrashLoopBackOff:** Occurs when liveness keeps failing repeatedly. OCP applies exponential backoff (10s → 20s → 40s → … → 5 min cap). The restart loop does not self-heal a broken app — the root cause must be fixed.
 

@@ -1,7 +1,7 @@
 # ACT 3 — Resource Requests & Limits
 
 > **Script:** `scripts/08-resources.sh`
-> **Goal:** Show how resource requests and limits govern scheduling, CPU throttling, and memory-based eviction — with a live CPU-burn demonstration.
+> **Overview:** Resource requests and limits govern scheduling, CPU throttling, and memory-based eviction in OpenShift.
 
 ---
 
@@ -33,7 +33,7 @@ limits    ──→  hard ceiling        (CPU: throttle / RAM: OOMKill + restart
 
 ## Steps
 
-### 1. Show empty (BestEffort) state
+### 1. BestEffort State (No Resources Configured)
 
 ```bash
 oc get deployment ocp-demo-app \
@@ -41,11 +41,11 @@ oc get deployment ocp-demo-app \
 # → {} or empty — BestEffort: first evicted under pressure
 ```
 
-> **Gotcha:** An empty `resources` block does not mean "no limits apply". It means the container competes for whatever is left — and can be evicted with no warning.
+> **Note:** An empty `resources` block does not mean "no limits apply". It means the container competes for whatever is left — and can be evicted without warning.
 
 ---
 
-### 2. Patch requests + limits
+### 2. Configuring Requests and Limits
 
 ```yaml
 resources:
@@ -70,9 +70,9 @@ oc patch deployment ocp-demo-app -n ocp-demo \
 
 ---
 
-### 3. Live CPU throttle demo
+### 3. CPU Throttle Behaviour
 
-Set a tight limit (`cpu: 100m`), then fire the CPU burn endpoint:
+With a tight CPU limit (`cpu: 100m`) and the CPU burn endpoint active:
 
 ```bash
 # Tighten the limit
@@ -91,9 +91,9 @@ watch oc adm top pod -n ocp-demo -l app=ocp-demo-app
 # CPU column stays CAPPED at 100m — throttled, not killed
 ```
 
-> **Take away:** CPU throttling is transparent to the application. The container slows but keeps running. Unlike memory — where exceeding the limit terminates the container immediately.
+> **Key point:** CPU throttling is transparent to the application. The container slows but keeps running. Unlike memory — where exceeding the limit terminates the container immediately.
 
-Restore the limit after the demo:
+Restore after the demonstration:
 
 ```bash
 oc set resources deployment/ocp-demo-app \
@@ -103,7 +103,7 @@ oc set resources deployment/ocp-demo-app \
 
 ---
 
-### 4. Verify with `oc adm top`
+### 4. Live Resource Consumption
 
 ```bash
 oc adm top pod -n ocp-demo -l app=ocp-demo-app
@@ -116,7 +116,7 @@ oc adm top pod -n ocp-demo -l app=ocp-demo-app
 
 ---
 
-### 5. Namespace-level guardrails
+### 5. Namespace-Level Guardrails
 
 ```bash
 # LimitRange — per-container defaults and maxima (set by cluster admin)
@@ -126,7 +126,7 @@ oc get limitrange -n ocp-demo
 oc get resourcequota -n ocp-demo
 ```
 
-> **Take away:** `LimitRange` injects default requests/limits when developers omit them, preventing BestEffort pods from reaching production. `ResourceQuota` caps the entire team's namespace budget.
+> **Key point:** `LimitRange` injects default requests/limits when developers omit them, preventing BestEffort pods from reaching production. `ResourceQuota` caps the entire team's namespace budget.
 
 ---
 

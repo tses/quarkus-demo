@@ -1,7 +1,7 @@
 # ACT 3 — Traffic Splitting
 
 > **Script:** `scripts/05-traffic-splitting.sh`
-> **Goal:** Demonstrate canary deployment using OpenShift Route weight splitting — live traffic distributed across two versions simultaneously.
+> **Overview:** OpenShift Route weight splitting enables canary deployments — distributing live traffic across two versions simultaneously without additional infrastructure.
 
 ---
 
@@ -15,13 +15,13 @@
 - Observe metrics under real load
 - Increase weight incrementally — or roll back instantly
 
-> **Take away:** No extra infrastructure required. Traffic splitting is a native Route feature.
+> **Key point:** No extra infrastructure required. Traffic splitting is a native Route feature.
 
 ---
 
 ## Steps
 
-### 1. Deploy v2 (same source, different environment labels)
+### 1. Deploy v2
 
 ```bash
 oc new-app \
@@ -37,13 +37,11 @@ oc set env deployment/ocp-demo-app-v2 \
   APP_COLOUR=green APP_VERSION=2.0.0 -n ocp-demo
 ```
 
-Both deployments appear as separate nodes in **Topology**.
-
-> **Goal:** v1 is currently receiving 100% of traffic. The next steps shift that incrementally.
+Both deployments appear as separate nodes in **Topology**. v1 receives 100% of traffic until the route weights are updated.
 
 ---
 
-### 2. Split 90% v1 / 10% v2
+### 2. Split: 90% v1 / 10% v2
 
 ```bash
 oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
@@ -54,7 +52,7 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-The script sends **20 requests** and reports which version responded:
+Sending 20 requests shows the weighted distribution across both versions:
 
 ```
 Request 1:  {"colour":"blue",...}   ← v1
@@ -63,7 +61,7 @@ Request 5:  {"colour":"green",...}  ← v2
 v1 responses: 18/20  |  v2 responses: 2/20
 ```
 
-> **Tip:** The response `colour` field distinguishes versions. Watch the distribution across 20 requests — it reflects the 90/10 weight.
+> **Tip:** The `colour` field in the response distinguishes versions. The distribution across 20 requests reflects the 90/10 weight.
 
 ---
 
@@ -78,11 +76,11 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> **Goal:** At this point, observe metrics for both versions in **Observe → Dashboards**. Only promote to 100% once error rates and latency are acceptable.
+> **Key point:** At 50/50, metrics for both versions are available in **Observe → Dashboards**. Promotion to 100% should be based on error rates and latency.
 
 ---
 
-### 4. Full cutover to v2
+### 4. Full Cutover to v2
 
 ```bash
 oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
@@ -93,11 +91,11 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> **Take away:** Cutover is instantaneous from the platform's perspective. No users experienced a request error during the transition.
+> **Key point:** Cutover is instantaneous. No users experience a request error during the transition.
 
 ---
 
-### 5. Emergency rollback (revert to v1)
+### 5. Emergency Rollback to v1
 
 ```bash
 oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
@@ -108,17 +106,17 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> **Take away:** Rollback is a single patch operation. Traffic shifts immediately upon execution.
+> **Key point:** Rollback is a single patch operation. Traffic shifts immediately upon execution.
 
 ---
 
-### 6. Cleanup — remove v2 resources
+### 6. Cleanup — Remove v2 Resources
 
 ```bash
 oc delete deployment,svc,bc,is ocp-demo-app-v2 -n ocp-demo --ignore-not-found
 ```
 
-v2 resources are removed at script end to avoid interfering with subsequent demos.
+v2 resources are removed to avoid interfering with subsequent steps.
 
 ---
 

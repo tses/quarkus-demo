@@ -1,6 +1,6 @@
 # ACT 2 — Deploy with S2I
 
-> **Goal:** Deploy a Quarkus application directly from source code, with no Dockerfile and no manual container build steps.
+> **Overview:** OpenShift deploys a Quarkus application directly from source code, with no Dockerfile and no manual container build steps.
 
 ---
 
@@ -13,19 +13,19 @@
 3. Produces a **container image** — no Dockerfile required
 4. **Deploys** the image and exposes a live HTTPS URL
 
-> **Take away:** S2I abstracts the container build pipeline. Developers provide source; the platform handles the rest.
+> **Key point:** S2I abstracts the container build pipeline. Developers provide source; the platform handles the rest.
 
 ---
 
 ## Steps
 
-### 1. Navigate to +Add
+### 1. Import from Git
 
-Navigate to: **+Add → Import from Git**
+**+Add → Import from Git**
 
 ---
 
-### 2. Paste the Git URL
+### 2. Git URL
 
 ```
 https://github.com/tses/quarkus-demo
@@ -33,13 +33,13 @@ https://github.com/tses/quarkus-demo
 
 Sub-directory (context dir): `app/ocp-demo-app`
 
-> **Tip:** Wait for the console to validate the URL and auto-detect the builder image before proceeding.
+> **Tip:** The console validates the URL and auto-detects the builder image before proceeding.
 
-> **Gotcha:** Auto-detection reads the project structure (e.g. `pom.xml`) to select the correct builder — in this case `java:openjdk-17-ubi8`.
+> **Note:** Auto-detection reads the project structure (e.g. `pom.xml`) to select the correct builder — in this case `java:openjdk-17-ubi8`.
 
 ---
 
-### 3. Review the auto-populated fields
+### 3. Auto-populated fields
 
 | Field | Value | Notes |
 |---|---|---|
@@ -48,33 +48,31 @@ Sub-directory (context dir): `app/ocp-demo-app`
 | Resource type | `Deployment` | Default — suitable for stateless apps |
 | Create a Route | ✅ | HTTPS exposure enabled by default |
 
-> **Tip:** All fields are editable. For this demo, the defaults are correct.
+> **Tip:** All fields are editable. The defaults are correct for this application.
 
 ---
 
-### 4. Click **Create** — observe the build
+### 4. Build Pipeline
 
-Navigate to: **Topology** — the app node appears with a build spinner.
+After clicking **Create**, a build spinner appears on the app node in **Topology**.
 
-Click the app node → **View Logs** (Build tab)
+Selecting the app node and opening **View Logs** (Build tab) shows the S2I build pipeline live: dependency download → compile → image assembly. This is the same process a CI/CD pipeline automates.
 
-> **Goal:** Show the S2I build pipeline live: dependency download → compile → image assembly. This is the same process a CI/CD pipeline would automate.
-
-**⏳ Allow the build log to stream. Do not skip — it makes the process transparent.**
+**⏳ Allow the build log to stream fully — it makes the process transparent.**
 
 ---
 
 ### 5. Build completes → Pod starts → Route is live
 
-Back in Topology view:
+Once the build completes, the Topology view updates:
 
-- Build pod disappears
-- App pod appears (dark blue ring = running and healthy)
-- Route URL appears (top-right arrow icon on the node)
+- The build pod disappears
+- The app pod appears (dark blue ring = running and healthy)
+- The Route URL appears (top-right arrow icon on the node)
 
-Click the **Route URL** → application opens in browser at `/api/info`.
+The **Route URL** opens the application at `/api/info`.
 
-> **Take away:** From a Git URL to a live, load-balanced HTTPS endpoint — no infrastructure tickets, no Dockerfile, no manual image push.
+> **Key point:** From a Git URL to a live, load-balanced HTTPS endpoint — no infrastructure tickets, no Dockerfile, no manual image push.
 
 ---
 

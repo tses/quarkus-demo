@@ -1,12 +1,10 @@
 # ACT 2 — Pods / Service / Route
 
-> **Goal:** Establish a clear mental model of the three core Kubernetes networking primitives before exploring them in the console.
+> **Overview:** Three core Kubernetes networking primitives — Pod, Service, and Route — form the foundation of application networking in OpenShift.
 
 ---
 
 ## The Three Primitives
-
-**30-second mental model — establish this before touching the UI:**
 
 ```
 Pod          → the running process (your app, in a container)
@@ -14,7 +12,7 @@ Service      → stable internal address for a group of pods
 Route        → public URL that points to the Service
 ```
 
-> **Tip:** An analogy: Pod = the kitchen, Service = the order counter, Route = the front door. The kitchen changes; the counter address stays the same.
+> **Analogy:** Pod = the kitchen, Service = the order counter, Route = the front door. The kitchen changes; the counter address stays the same.
 
 ---
 
@@ -22,34 +20,31 @@ Route        → public URL that points to the Service
 
 ### 1. Topology View — The Live Diagram
 
-Navigate to: **Topology**
+**Topology**
 
-Point out:
-- The app node (circle) — click to expand
+The app node (circle) expands to reveal:
 - **Dark blue ring** = pod is running and healthy
 - **Arrow icon** (top-right of node) = Route URL
 
-> **Take away:** The Topology view is not a static diagram. It reflects actual cluster state — updated in real time as pods start, stop, or fail.
+> **Key point:** The Topology view is not a static diagram. It reflects actual cluster state — updated in real time as pods start, stop, or fail.
 
 ---
 
-### 2. Click the App Node → Side Panel
+### 2. App Node Side Panel
 
-Show the side panel tabs:
+Clicking the app node opens a side panel with the following tabs:
 
 - **Details** — replicas, labels, image reference
 - **Resources** — pod list, services, routes
 - **Observe** — inline metrics preview
 
-Click on the **Pod name** in the Resources tab.
+The **Pod name** in the Resources tab links to the Pod detail page.
 
 ---
 
 ### 3. Inside the Pod
 
-Navigate to: Pod detail page
-
-Show tabs:
+The Pod detail page provides:
 
 - **Details** — which node it runs on, current status, pod IP
 - **Logs** — live application output
@@ -61,13 +56,13 @@ ls /deployments
 cat /etc/os-release
 ```
 
-> **Gotcha:** Browser-based shell access requires no SSH and no VPN. This is the standard debugging path for containerised workloads — not a workaround.
+> **Note:** Browser-based shell access requires no SSH and no VPN. This is the standard debugging path for containerised workloads.
 
 ---
 
-### 4. Show the Service
+### 4. The Service
 
-Navigate to: **Project → Services** (or via Resources tab)
+**Project → Services** (or via the Resources tab)
 
 ```bash
 # CLI equivalent
@@ -75,19 +70,19 @@ oc get svc
 oc describe svc ocp-demo-app
 ```
 
-Point out:
+Key fields:
 
 - `ClusterIP` — internal address only, not reachable from outside the cluster
 - Port mapping
 - `selector` field — how the Service identifies its target pods
 
-> **Gotcha:** A Service has no direct knowledge of specific pods. It queries: *"which pods carry this label?"* — and routes to whatever matches. This is label-based discovery, not hardcoded references.
+> **Note:** A Service has no direct knowledge of specific pods. It queries: *"which pods carry this label?"* — and routes to whatever matches. This is label-based discovery, not hardcoded references.
 
 ---
 
-### 5. Show the Route
+### 5. The Route
 
-Navigate to: **Networking → Routes**
+**Networking → Routes**
 
 ```bash
 # CLI equivalent
@@ -95,12 +90,12 @@ oc get route ocp-demo-app
 oc describe route ocp-demo-app
 ```
 
-Point out:
+Key fields:
 
 - **TLS termination** — HTTPS enabled automatically ✅
 - Host URL pattern: `<app>-<project>.<cluster-domain>`
 
-> **Take away:** HTTPS termination requires zero manual certificate management. The cluster handles provisioning and renewal.
+> **Key point:** HTTPS termination requires zero manual certificate management. The cluster handles provisioning and renewal.
 
 ---
 

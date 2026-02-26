@@ -1,7 +1,7 @@
 # ACT 3 — Deploying the Postgres Operator
 
 > **Script:** `scripts/06-operator-postgres.sh` (CLI verification after console install)
-> **Goal:** Demonstrate the Operator pattern — provisioning a production-grade PostgreSQL cluster via a custom resource, with no manual DBA steps.
+> **Overview:** The Operator pattern enables provisioning of a production-grade PostgreSQL cluster via a custom resource, with no manual DBA steps.
 
 ---
 
@@ -21,19 +21,19 @@
 - Declare the desired state in a Custom Resource (CR)
 - The Operator reconciles actual state to match declared state — continuously
 
-> **Take away:** An Operator replaces a human operator for Day-2 tasks. It is always available, always consistent, and does not require a support ticket.
+> **Key point:** An Operator replaces manual Day-2 operations. It is always available, always consistent, and does not require a support ticket.
 
 ---
 
 ## Steps
 
-### 1. Navigate to OperatorHub (Console)
+### 1. OperatorHub
 
-Navigate to: **Operators → OperatorHub**
+**Operators → OperatorHub**
 
 Search for: `PostgreSQL`
 
-> **Tip:** OperatorHub lists Red Hat certified, community, and ISV operators. The certification level indicates the level of support and testing.
+> **Note:** OperatorHub lists Red Hat certified, community, and ISV operators. The certification level indicates the level of support and testing.
 
 Select **Crunchy Postgres for Kubernetes**.
 
@@ -41,7 +41,7 @@ Select **Crunchy Postgres for Kubernetes**.
 
 ### 2. Install the Operator
 
-Click **Install** → review settings:
+**Install** → review settings:
 
 | Setting | Value |
 |---|---|
@@ -49,11 +49,9 @@ Click **Install** → review settings:
 | Update Channel | stable |
 | Approval Strategy | Automatic |
 
-Click **Install**. Return to the terminal once installation begins.
-
 ---
 
-### 3. Verify operator installation
+### 3. Verify Operator Installation
 
 ```bash
 oc get csv -n ocp-demo | grep -i postgres
@@ -63,7 +61,7 @@ Wait for `PHASE: Succeeded` before proceeding.
 
 ---
 
-### 4. Create a PostgresCluster custom resource
+### 4. PostgresCluster Custom Resource
 
 ```yaml
 apiVersion: postgres-operator.crunchydata.com/v1beta1
@@ -93,30 +91,30 @@ spec:
                   storage: 1Gi
 ```
 
-> **Goal:** This YAML expresses *what* is needed. The Operator determines *how* to provision it — pods, PVCs, services, secrets — and maintains that state going forward.
+> **Key point:** This YAML expresses *what* is needed. The Operator determines *how* to provision it — pods, PVCs, services, secrets — and maintains that state going forward.
 
 ---
 
-### 5. Watch the cluster come up
+### 5. Cluster Provisioning
 
-Navigate to: **Topology** — Postgres pods appear within ~60 seconds.
+Postgres pods appear in **Topology** within ~60 seconds.
 
 ```bash
 oc get pods -l postgres-operator.crunchydata.com/cluster=demo-db -n ocp-demo
 ```
 
-> **Tip:** The Operator creates: the Postgres pod, a pgBackRest sidecar for backups, and a Kubernetes `Secret` containing connection credentials — all from the single CR above.
+> **Note:** The Operator creates: the Postgres pod, a pgBackRest sidecar for backups, and a Kubernetes `Secret` containing connection credentials — all from the single CR above.
 
 ---
 
-### 6. Inspect the connection secret
+### 6. Connection Secret
 
 ```bash
 oc get secret demo-db-pguser-demo-db -n ocp-demo \
   -o jsonpath='{.data.uri}' | base64 -d
 ```
 
-> **Take away:** Applications consume this secret as an environment variable. No developer or operator needs to know the credentials — the Operator generates and rotates them.
+> **Key point:** Applications consume this secret as an environment variable. No developer or operator sees the credentials directly — the Operator generates and rotates them.
 
 ---
 

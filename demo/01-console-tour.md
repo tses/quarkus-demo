@@ -1,17 +1,17 @@
 # ACT 1 — Console Tour
 
-> **Goal:** Orient the audience to the OpenShift 4.20 unified console before any hands-on work begins.
+> **Overview:** OpenShift 4.20 provides a unified console that combines Developer and Administrator capabilities into a single, streamlined view.
 
 ---
 
-## Goal
+## Overview
 
-Show that OpenShift 4.20 has a **unified console** that combines Developer and Administrator capabilities into a single, streamlined view:
+OpenShift 4.20 has a **unified console** that consolidates Developer and Administrator capabilities into a single, streamlined view:
 
-- **Unified perspective** — topology, workloads, nodes, quotas, operators, and cluster health all in one place
-- **Unified software catalog** — developer catalog and Operators accessible from a single location
+- **Unified perspective** — topology, workloads, nodes, quotas, operators, and cluster health are all accessible from one place
+- **Unified software catalog** — the developer catalog and Operators are available from a single location
 
-> **Gotcha:** Most people expect "just another kubectl UI". The unified-perspective design is a deliberate UX choice — not cosmetic — eliminating context-switching between developer and admin tasks.
+> **Note:** The unified-perspective design is a deliberate UX choice — not cosmetic — eliminating context-switching between developer and admin tasks. Users familiar with other Kubernetes UIs may expect separate views; OpenShift consolidates them intentionally.
 
 ---
 
@@ -23,55 +23,56 @@ Show that OpenShift 4.20 has a **unified console** that combines Developer and A
 https://<your-cluster-console-url>
 ```
 
-> **Tip:** Bookmark this URL. Everything you can do with `oc` CLI can also be done here, against the same API.
+> **Tip:** Bookmark this URL. Everything available via the `oc` CLI is also accessible here, against the same API.
 
 ---
 
-### 2. Show the Unified Perspective
+### 2. The Unified Perspective
 
-The top-left nav provides a **single unified view** for all roles:
+The top-left navigation provides a **single unified view** for all roles:
 
-- Navigate across: Topology, Workloads, Networking, Storage, Compute, Operators, Observe — all from the same console
-- RBAC still controls what each role can *act* on
+- Available sections include: Topology, Workloads, Networking, Storage, Compute, Operators, and Observe — all from the same console
+- RBAC controls what each role can *act* on; the view itself is unified
 
-> **Take away:** One console for developers and administrators alike. Everyone sees a cohesive view of the cluster; permissions determine what they can change.
+> **Key point:** One console serves both developers and administrators. Everyone sees a cohesive view of the cluster; permissions determine what they can change.
 
 ---
 
 ### 3. Topology View
 
-Navigate to: **Observe → Topology**
+**Observe → Topology**
 
-- Empty namespace for now (populated in Act 2)
-- Drag-and-drop layout, visual grouping, live health indicators
+- The namespace is initially empty (populated in Act 2)
+- The topology view supports drag-and-drop layout, visual grouping, and live health indicators
 
-> **Goal:** This view reflects the live state of every deployed workload — connections, health, and routes — updated in real time.
+> **Key point:** The Topology view reflects the live state of every deployed workload — connections, health, and routes — updated in real time.
 
 ---
 
 ### 4. Unified Software Catalog
 
-Navigate to: **+Add → Software Catalog** (or the **Catalog** entry in the nav)
+**+Add → Software Catalog** (or the **Catalog** entry in the nav)
 
 - The **developer catalog** and the **Operators** section are merged into a single location
-- Browse Helm charts, templates, Operator-backed services, and builder images all from one screen
+- Helm charts, templates, Operator-backed services, and builder images are all browsable from one screen
 
-> **Tip:** Developer catalog and Operators are now in the same place — no need to navigate to separate sections.
+> **Tip:** Developer catalog and Operators are in the same place — no separate navigation sections required.
 
 ---
 
-### 5. Quick Tour of Key Admin Sections
+### 5. Key Admin Sections
 
-Navigate briefly to:
+The following sections are available from the main navigation:
+
 - **Compute → Nodes** — cluster nodes and their current status
 - **Operators → Installed Operators** — revisited in Act 3
 - **Observe → Dashboards** — revisited in Act 3
 
-> **Tip:** No need to memorise these paths now. The intent is to show that cluster-level visibility is built in, not bolted on.
+> **Note:** Cluster-level visibility is built into the console — not added via a separate tool or plugin.
 
 ---
 
-### 6. Show the `oc` CLI (terminal)
+### 6. The `oc` CLI
 
 ```bash
 oc login --server=https://<cluster-api-url> --token=<your-token>
@@ -79,7 +80,7 @@ oc whoami
 oc get nodes
 ```
 
-> **Take away:** Console and CLI are equivalent interfaces to the same Kubernetes API. This demo uses both — choose whichever fits your workflow.
+> **Key point:** The console and CLI are equivalent interfaces to the same Kubernetes API. Either can be used interchangeably — the underlying operations are identical.
 
 ---
 

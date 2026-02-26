@@ -1,7 +1,7 @@
 # ACT 3 — Scaling Out
 
 > **Script:** `scripts/10-scaling.sh`
-> **Goal:** Demonstrate manual horizontal scaling and Horizontal Pod Autoscaler (HPA) reacting to real CPU load.
+> **Overview:** OpenShift supports both manual horizontal scaling and automatic scaling via the Horizontal Pod Autoscaler (HPA), which reacts to real CPU load.
 
 ---
 
@@ -20,21 +20,21 @@ Auto Scaling    → platform decides based on observed metrics (HPA)
 
 ## Steps
 
-### 1. Manual scale UP to 3 replicas
+### 1. Manual Scale UP to 3 Replicas
 
 ```bash
 oc scale deployment/ocp-demo-app --replicas=3 -n ocp-demo
 ```
 
-Observe in Topology: 3 pods appear, all with dark blue ring (healthy).
+In Topology, 3 pods appear — all with a dark blue ring (healthy).
 
-The script sends **6 requests** and prints the `hostname` field from each response — demonstrating load distribution across all 3 pods.
+Sending 6 requests and inspecting the `hostname` field in each response demonstrates round-robin load distribution across all 3 pods.
 
-> **Take away:** Round-robin load balancing across all healthy replicas is automatic. No additional configuration required.
+> **Key point:** Round-robin load balancing across all healthy replicas is automatic. No additional configuration required.
 
 ---
 
-### 2. Scale back DOWN to 1 replica
+### 2. Scale Back Down to 1 Replica
 
 ```bash
 oc scale deployment/ocp-demo-app --replicas=1 -n ocp-demo
@@ -42,7 +42,7 @@ oc scale deployment/ocp-demo-app --replicas=1 -n ocp-demo
 
 ---
 
-### 3. Configure a Horizontal Pod Autoscaler (HPA)
+### 3. Horizontal Pod Autoscaler (HPA)
 
 ```bash
 oc autoscale deployment/ocp-demo-app \
@@ -56,13 +56,13 @@ oc get hpa ocp-demo-app -n ocp-demo
 # ocp-demo-app   <unknown>  1         5         1
 ```
 
-> **Gotcha:** `TARGETS: <unknown>` is expected immediately after HPA creation. The controller requires one metrics scrape interval to populate the current CPU value. It will resolve within ~30 seconds.
+> **Note:** `TARGETS: <unknown>` is expected immediately after HPA creation. The controller requires one metrics scrape interval to populate the current CPU value — this resolves within ~30 seconds.
 
-> **Take away:** When average CPU across all running pods exceeds 50%, the HPA scales up — to a maximum of 5 replicas. When load drops, it scales back down to the minimum.
+> **Key point:** When average CPU across all running pods exceeds 50%, the HPA scales up — to a maximum of 5 replicas. When load drops, it scales back down to the configured minimum.
 
 ---
 
-### 4. Trigger real CPU load — observe HPA response
+### 4. HPA Response to Real CPU Load
 
 The script launches **10 parallel clients**, each calling `/api/burn?seconds=90` in a loop for 120 seconds:
 
@@ -73,7 +73,7 @@ for c in $(seq 1 10); do
 done
 ```
 
-Live pod status is printed every 5 seconds:
+Pod status is polled every 5 seconds:
 
 ```
 [t+0s]   ocp-demo-app-xxx(Running)
@@ -81,18 +81,18 @@ Live pod status is printed every 5 seconds:
 [t+60s]  ... 4 pods running
 ```
 
-> **Goal:** Observe the HPA controller increasing the replica count in response to measured CPU pressure — without any manual intervention.
+The HPA controller increases the replica count in response to measured CPU pressure — without any manual intervention.
 
 ---
 
-### 5. Cleanup — HPA removed, reset to 3 replicas
+### 5. Cleanup
 
 ```bash
 oc delete hpa ocp-demo-app -n ocp-demo --ignore-not-found
 oc scale deployment/ocp-demo-app --replicas=3 -n ocp-demo
 ```
 
-The deployment is reset to 3 replicas as the starting state for the self-healing demo.
+The deployment is reset to 3 replicas as the starting state for the self-healing demonstration.
 
 ---
 

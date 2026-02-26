@@ -1,7 +1,7 @@
 # ACT 3 — Deployment Strategies
 
 > **Script:** `scripts/04-deployment-strategies.sh`
-> **Goal:** Demonstrate rolling update vs. recreate strategies, rollout history with change tracking, and one-command rollback.
+> **Overview:** OpenShift supports rolling update and recreate deployment strategies, with built-in rollout history and one-command rollback.
 
 ---
 
@@ -14,13 +14,13 @@ RollingUpdate  → new pods UP before old pods DOWN  (zero downtime)
 Recreate       → all old pods DOWN, then new pods UP (brief downtime — required for DB migrations)
 ```
 
-> **Gotcha:** The question is not "which strategy is better". It is "what does your application require". Stateless APIs: `RollingUpdate`. Singleton or schema-migration services: `Recreate`.
+> **Note:** The choice of strategy depends on application requirements. Stateless APIs use `RollingUpdate`. Singleton or schema-migration services require `Recreate`.
 
 ---
 
 ## Steps
 
-### 1. Review current strategy and explain the parameters
+### 1. Rolling Update — Parameters
 
 Key parameters for `RollingUpdate`:
 
@@ -32,7 +32,7 @@ maxUnavailable: 25%  — maximum pods that may be unavailable during update
                        (e.g. 4 replicas → at least 3 always serving traffic)
 ```
 
-> **Take away:** `maxSurge` and `maxUnavailable` together enforce the zero-downtime guarantee: new pods become healthy **before** old pods are terminated.
+> **Key point:** `maxSurge` and `maxUnavailable` together enforce the zero-downtime guarantee: new pods become healthy **before** old pods are terminated.
 
 Inspect the live configuration:
 
@@ -45,7 +45,7 @@ MaxUnavailable: {.spec.strategy.rollingUpdate.maxUnavailable}'
 
 ---
 
-### 2. Trigger a rollout — observe live in Topology
+### 2. Triggering a Rollout
 
 ```bash
 # Inject APP_VERSION — MicroProfile maps app.version → APP_VERSION
@@ -57,7 +57,7 @@ oc annotate deployment/ocp-demo-app \
   kubernetes.io/change-cause="demo rollout v<timestamp>" --overwrite -n ocp-demo
 ```
 
-Switch to **Topology view** — old pods terminate only after new pods report healthy.
+In the **Topology view**, old pods terminate only after new pods report healthy.
 
 After rollout: `curl /api/info` returns the updated `"version"` field.
 
@@ -65,29 +65,29 @@ After rollout: `curl /api/info` returns the updated `"version"` field.
 
 ---
 
-### 3. Inspect rollout history with CHANGE-CAUSE
+### 3. Rollout History with CHANGE-CAUSE
 
 ```bash
 oc rollout history deployment/ocp-demo-app -n ocp-demo
 ```
 
-Each revision shows the `CHANGE-CAUSE` annotation — providing an auditable deployment log.
+Each revision includes the `CHANGE-CAUSE` annotation — providing an auditable deployment log.
 
-> **Take away:** Every deployment is recorded. Any revision can be targeted for rollback.
+> **Key point:** Every deployment is recorded. Any revision can be targeted for rollback.
 
 ---
 
-### 4. One-command rollback
+### 4. One-Command Rollback
 
 ```bash
 oc rollout undo deployment/ocp-demo-app -n ocp-demo
 ```
 
-> **Take away:** Instant rollback to the previous revision. No hotfix branch, no re-deploy pipeline.
+> **Key point:** Instant rollback to the previous revision. No hotfix branch, no re-deploy pipeline.
 
 ---
 
-### 5. Recreate strategy (reference — not executed)
+### 5. Recreate Strategy
 
 ```yaml
 strategy:
@@ -96,7 +96,7 @@ strategy:
                           # (e.g. DB schema migration, singleton lock)
 ```
 
-> **Gotcha:** `Recreate` is not a fallback for when `RollingUpdate` is "too complex". It is the correct choice when running two versions of an application concurrently would corrupt data or violate a constraint.
+> **Note:** `Recreate` is the correct choice when running two versions of an application concurrently would corrupt data or violate a constraint — not a fallback for when `RollingUpdate` is "too complex".
 
 ---
 

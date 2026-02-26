@@ -1,13 +1,13 @@
 # ACT 3 — Monitoring: ServiceMonitor & Prometheus
 
 > **Script:** `scripts/07-monitoring.sh`
-> **Goal:** Register the application with the cluster Prometheus stack via a `ServiceMonitor` — making all Micrometer metrics visible in the OpenShift Observe console.
+> **Overview:** OpenShift ships with a full monitoring stack (Prometheus + Alertmanager + Thanos) pre-installed. User workloads are registered for scraping via a `ServiceMonitor` custom resource.
 
 ---
 
 ## Mental Model
 
-OpenShift ships with a full monitoring stack (Prometheus + Alertmanager + Thanos) pre-installed. To scrape a **user workload**, register a `ServiceMonitor` — a CR that tells Prometheus where and how to pull metrics from your Service.
+To scrape a **user workload**, a `ServiceMonitor` CR tells Prometheus where and how to pull metrics from a Service:
 
 ```
 App → exposes /q/metrics (Prometheus text format)
@@ -16,13 +16,13 @@ Prometheus → stores the time-series data
 Console → Observe → Metrics / Targets / Dashboards
 ```
 
-> **Take away:** No Prometheus configuration files to edit. No YAML to merge into a cluster config. One CR — and the app is scraped.
+> **Key point:** No Prometheus configuration files to edit. No YAML to merge into a cluster config. One CR — and the app is scraped.
 
 ---
 
 ## Steps
 
-### 1. Verify the live metrics endpoint
+### 1. Live Metrics Endpoint
 
 The Quarkus app exposes Micrometer metrics at `/q/metrics` out of the box — no instrumentation code required:
 
@@ -37,7 +37,7 @@ Included automatically:
 
 ---
 
-### 2. Enable user-workload monitoring (cluster-admin, once per cluster)
+### 2. Enable User-Workload Monitoring (cluster-admin, once per cluster)
 
 ```yaml
 # ConfigMap: openshift-monitoring / cluster-monitoring-config
@@ -46,11 +46,11 @@ data:
     enableUserWorkload: true
 ```
 
-> **Gotcha:** Without this flag, Prometheus only scrapes cluster infrastructure components. User workloads are opt-in at the cluster level — this is a deliberate security boundary.
+> **Note:** Without this flag, Prometheus only scrapes cluster infrastructure components. User workloads are opt-in at the cluster level — this is a deliberate security boundary.
 
 ---
 
-### 3. Apply the ServiceMonitor
+### 3. ServiceMonitor
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -74,15 +74,15 @@ oc apply -f servicemonitor.yaml -n ocp-demo
 oc get servicemonitor -n ocp-demo
 ```
 
-> **Goal:** Within ~30 seconds, the app endpoint appears under **Observe → Targets** with status `UP`.
+Within ~30 seconds, the app endpoint appears under **Observe → Targets** with status `UP`.
 
 ---
 
-### 4. Query metrics in the console
+### 4. Querying Metrics in the Console
 
-Navigate to: **Observe → Metrics**
+**Observe → Metrics**
 
-Try these PromQL queries:
+Example PromQL queries:
 
 ```promql
 # HTTP request rate (all endpoints)
