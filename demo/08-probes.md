@@ -1,7 +1,7 @@
 # ACT 3 — Liveness & Readiness Probes
 
-> **Script:** `scripts/09-probes.sh`
-> **Goal:** Configure health probes, observe their distinct failure behaviours live, and understand why the distinction matters.
+> **Script:** `scripts/08-probes.sh`
+> **Goal:** Understand the two probe types, their distinct failure actions, and how to configure them correctly.
 
 ---
 
@@ -36,21 +36,7 @@ class AppReadiness implements HealthCheck { ... }  // → /q/health/ready
 
 ## Steps
 
-### 1. Verify the live health endpoints
-
-```bash
-curl http://<route>/q/health/live
-# {"status":"UP","checks":[{"name":"app-live","status":"UP","data":{"hostname":"..."}}]}
-
-curl http://<route>/q/health/ready
-# {"status":"UP","checks":[{"name":"app-ready","status":"UP","data":{"status":"all systems nominal"}}]}
-```
-
-> **Tip:** These endpoints are served by the app itself. Kubernetes calls them periodically — any non-2xx response counts as a failure.
-
----
-
-### 2. Show state without probes
+### 1. Show state without probes
 
 ```bash
 oc get deployment ocp-demo-app \
@@ -62,7 +48,7 @@ oc get deployment ocp-demo-app \
 
 ---
 
-### 3. Patch both probes
+### 2. Probe configuration
 
 ```yaml
 livenessProbe:
@@ -95,51 +81,22 @@ oc get deployment ocp-demo-app \
 
 ---
 
-### 4. Live demo — readiness probe failure
+### 3. What probe failures look like
 
-Break the readiness probe by setting an invalid path:
-
-```bash
-oc patch deployment ocp-demo-app -n ocp-demo --type=json \
-  -p '[{"op":"replace",
-        "path":"/spec/template/spec/containers/0/readinessProbe/httpGet/path",
-        "value":"/bad"}]'
-```
-
-Observe the pod state:
+**Readiness failure** (`oc get pods` + `oc get events`):
 
 ```bash
 oc get pods -l app=ocp-demo-app -n ocp-demo
 # NAME                        READY   STATUS    RESTARTS
 # ocp-demo-app-xxx-yyy        0/1     Running   0   ← alive but NOT in Service
-```
 
-Note: `RESTARTS` stays at 0 — the container is alive. Only traffic stops.
-
-```bash
-# Traffic is gone — the pod is no longer in Service endpoints
-curl http://<route>/api/info
-# → 503 Service Unavailable or connection refused
-
-# Events confirm the failure
 oc get events -n ocp-demo --sort-by='.lastTimestamp' | grep -i unhealthy
 # Warning  Unhealthy  Readiness probe failed: HTTP probe failed with statuscode: 404
 ```
 
-Restore the path — traffic returns within seconds:
+Note: `RESTARTS` stays at 0 — the container is alive, only removed from traffic.
 
-```bash
-oc patch deployment ocp-demo-app -n ocp-demo --type=json \
-  -p '[{"op":"replace",
-        "path":"/spec/template/spec/containers/0/readinessProbe/httpGet/path",
-        "value":"/q/health/ready"}]'
-```
-
-> **Take away:** The platform removed traffic from the broken pod and restored it automatically — no alerting pipeline, no manual endpoint update.
-
----
-
-### 5. What a liveness failure looks like (reference)
+**Liveness failure** (`oc describe pod`):
 
 ```
 Warning  Unhealthy  Liveness probe failed: HTTP probe failed with statuscode: 503
@@ -148,7 +105,7 @@ Normal   Pulled     Successfully pulled image ...
 Normal   Started    Started container demo-app
 ```
 
-Key differences vs readiness failure:
+Key differences:
 
 | | Readiness fail | Liveness fail |
 |---|---|---|
@@ -158,6 +115,8 @@ Key differences vs readiness failure:
 | Recovery | Automatic when probe passes | Automatic **if** the root cause is fixed |
 
 > **Gotcha:** A liveness probe that fires too aggressively (low `initialDelaySeconds`, low `failureThreshold`) will restart a healthy app that simply hasn't warmed up yet — causing CrashLoopBackOff on a perfectly good image.
+
+> **CrashLoopBackOff:** Occurs when liveness keeps failing repeatedly. OCP applies exponential backoff (10s → 20s → 40s → … → 5 min cap). The restart loop does not self-heal a broken app — the root cause must be fixed.
 
 ---
 
@@ -186,6 +145,9 @@ oc get events -n ocp-demo --sort-by='.lastTimestamp' | grep -i unhealthy
 
 # Pod readiness status
 oc get pods -l app=ocp-demo-app -n ocp-demo
+
+# Full pod detail including probe status
+oc describe pod <pod-name> -n ocp-demo
 ```
 
 ---
