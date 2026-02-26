@@ -1,27 +1,27 @@
 # ACT 2 — Deploy with S2I
 
-> **Duration:** ~10 minutes  
-> **Message:** *"Ο developer δίνει κώδικα. Το platform κάνει τα υπόλοιπα."*
+> **Goal:** Deploy a Quarkus application directly from source code, with no Dockerfile and no manual container build steps.
 
 ---
 
-## 🎯 What is S2I?
+## What is S2I?
 
-**Source-to-Image (S2I)** is an OpenShift mechanism that:
-1. Takes your **source code** (Git URL)
-2. Detects the **language/framework** automatically
-3. Builds a **container image** — no Dockerfile needed
-4. **Deploys** it and exposes it — with a live URL
+**Source-to-Image (S2I)** is an OpenShift build mechanism that:
 
-> 💬 *"Δεν χρειάζεστε να ξέρετε τίποτα για containers για να κάνετε deploy. Το platform το αφαιρεί."*
+1. Accepts a **source code repository** (Git URL)
+2. Auto-detects the **language / framework**
+3. Produces a **container image** — no Dockerfile required
+4. **Deploys** the image and exposes a live HTTPS URL
+
+> **Take away:** S2I abstracts the container build pipeline. Developers provide source; the platform handles the rest.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
-### 1. Switch to Developer Perspective → +Add
+### 1. Navigate to +Add
 
-Navigate to: **Developer → +Add → Import from Git**
+Navigate to: **+Add → Import from Git**
 
 ---
 
@@ -33,52 +33,52 @@ https://github.com/tses/quarkus-demo
 
 Sub-directory (context dir): `app/ocp-demo-app`
 
-> 💬 *"Αυτό είναι το repo μας. Quarkus Java application. Ας δούμε τι καταλαβαίνει το OpenShift..."*
+> **Tip:** Wait for the console to validate the URL and auto-detect the builder image before proceeding.
 
-**Pause** — let the console validate and auto-detect the builder image.
-
-> 💬 *"Το είδε. Java 17. Διάλεξε μόνο του το κατάλληλο builder image."*
+> **Gotcha:** Auto-detection reads the project structure (e.g. `pom.xml`) to select the correct builder — in this case `java:openjdk-17-ubi8`.
 
 ---
 
 ### 3. Review the auto-populated fields
 
-Show the audience:
-- **Builder Image**: `java:openjdk-17-ubi8` (auto-detected)
-- **Application Name**: `ocp-demo-app`
-- **Resource type**: Deployment (default)
-- **Create a Route**: ✅ checked
+| Field | Value | Notes |
+|---|---|---|
+| Builder Image | `java:openjdk-17-ubi8` | Auto-detected from source |
+| Application Name | `ocp-demo-app` | Editable |
+| Resource type | `Deployment` | Default — suitable for stateless apps |
+| Create a Route | ✅ | HTTPS exposure enabled by default |
 
-> 💬 *"Θα μπορούσαμε να αλλάξουμε οτιδήποτε. Αλλά δεν χρειάζεται. Πατάμε Create."*
+> **Tip:** All fields are editable. For this demo, the defaults are correct.
 
 ---
 
-### 4. Click **Create** — and watch the build
+### 4. Click **Create** — observe the build
 
-Navigate to: **Developer → Topology** — the app appears with a spinner (building)
+Navigate to: **Topology** — the app node appears with a build spinner.
 
-Click on the app node → **View Logs** (Build tab)
+Click the app node → **View Logs** (Build tab)
 
-> 💬 *"Αυτό που βλέπετε είναι ο S2I builder να κατεβάζει dependencies, να κάνει compile, να φτιάχνει το container image. Real time."*
+> **Goal:** Show the S2I build pipeline live: dependency download → compile → image assembly. This is the same process a CI/CD pipeline would automate.
 
-**⏳ Let the build stream. Do not skip this moment. The audience needs to see the logs moving.**
+**⏳ Allow the build log to stream. Do not skip — it makes the process transparent.**
 
 ---
 
 ### 5. Build completes → Pod starts → Route is live
 
 Back in Topology view:
+
 - Build pod disappears
-- App pod appears (dark blue ring = running)
-- Route URL appears (top-right arrow icon)
+- App pod appears (dark blue ring = running and healthy)
+- Route URL appears (top-right arrow icon on the node)
 
-Click the **Route URL** → app opens in browser at `/api/info`.
+Click the **Route URL** → application opens in browser at `/api/info`.
 
-> 💬 *"Αυτό είναι production-ready URL. HTTPS. Load balanced. Από ένα Git URL, σε λίγα λεπτά."*
+> **Take away:** From a Git URL to a live, load-balanced HTTPS endpoint — no infrastructure tickets, no Dockerfile, no manual image push.
 
 ---
 
-## ⚡ The CLI Equivalent (script: `scripts/02-deploy-s2i.sh`)
+## CLI Equivalent (`scripts/02-deploy-s2i.sh`)
 
 ```bash
 oc new-app \
@@ -94,30 +94,30 @@ oc logs -f bc/ocp-demo-app -n ocp-demo
 oc expose svc/ocp-demo-app -n ocp-demo
 ```
 
-> 💬 *"Ακριβώς το ίδιο — τρεις εντολές. CI/CD pipeline το κάνει αυτό αυτόματα."*
+> **Tip:** Three commands — equivalent to the console flow. CI/CD pipelines run exactly this sequence.
 
 ---
 
-## 🔗 App Endpoints
+## App Endpoints
 
 | Endpoint | Description |
-|----------|-------------|
-| `GET /api/info` | hostname (pod name), version, colour |
-| `GET /api/burn?seconds=30` | CPU stress → triggers HPA |
-| `GET /q/health` | liveness + readiness probes |
+|---|---|
+| `GET /api/info` | Pod hostname, version, colour |
+| `GET /api/burn?seconds=30` | CPU stress — used to trigger HPA in Act 3 |
+| `GET /q/health` | Liveness + readiness probe responses |
 | `GET /q/metrics` | Prometheus metrics (Micrometer) |
 | `GET /swagger-ui` | OpenAPI UI |
 
 ---
 
-## 📌 Recap
+## Recap
 
-| Έδειξα | Μήνυμα |
-|--------|--------|
-| Import from Git | Το μόνο που χρειάζεται ο developer |
-| Auto-detection | Το platform καταλαβαίνει το framework |
-| Build logs live | Διαφάνεια — ξέρεις τι συμβαίνει |
-| App live in browser | End-to-end σε λεπτά |
+| Demonstrated | Key point |
+|---|---|
+| Import from Git | Single input required from the developer |
+| Auto-detection | Platform identifies framework and selects builder |
+| Live build logs | Full build transparency — auditable |
+| App live in browser | End-to-end deployment in minutes |
 
 ---
 

@@ -1,26 +1,27 @@
 # ACT 3 — Traffic Splitting
 
-> **Duration:** ~8 minutes  
-> **Script:** `scripts/05-traffic-splitting.sh`  
-> **Wow Factor:** Canary release με live traffic weights — audience sees both versions respond  
-> **Message:** *"Production risk management με μία εντολή. Zero downtime. Zero on-call panic."*
+> **Script:** `scripts/05-traffic-splitting.sh`
+> **Goal:** Demonstrate canary deployment using OpenShift Route weight splitting — live traffic distributed across two versions simultaneously.
 
 ---
 
-## 🎯 Mental Model First
+## Mental Model
 
-> 💬 *"Φανταστείτε ότι βγάλατε νέα έκδοση. Δεν είστε 100% σίγουροι ότι είναι OK. Τι κάνετε;"*
+**The problem:** A new version is ready. Full cutover carries risk. Staging environments do not reflect real production traffic patterns.
 
-**Old world:** Deploy to staging → wait → deploy to prod → pray.  
-**OpenShift:** Send 10% of REAL traffic to v2. Watch metrics. If OK → slide to 100%. If not → slide back to 0.
+**The solution — Canary Deployment:**
 
-This is **Canary Deployment**. No extra infrastructure. Built in.
+- Route a small percentage of **real production traffic** to v2
+- Observe metrics under real load
+- Increase weight incrementally — or roll back instantly
+
+> **Take away:** No extra infrastructure required. Traffic splitting is a native Route feature.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
-### 1. Deploy v2 (same source, different env labels)
+### 1. Deploy v2 (same source, different environment labels)
 
 ```bash
 oc new-app \
@@ -31,14 +32,14 @@ oc new-app \
   --labels=app=ocp-demo-app-v2,demo=ocp-intro,version=v2 \
   -n ocp-demo
 
-# Mark v2 visually — /api/info returns "colour":"green"
+# Distinguish v2 visually — /api/info returns "colour":"green"
 oc set env deployment/ocp-demo-app-v2 \
   APP_COLOUR=green APP_VERSION=2.0.0 -n ocp-demo
 ```
 
-> 💬 *"Έχουμε δύο εκδόσεις. Η v1 παίρνει όλο το traffic τώρα. Θα αλλάξουμε αυτό."*
+Both deployments appear as separate nodes in **Topology**.
 
-Both deployments visible as separate nodes in **Developer → Topology**.
+> **Goal:** v1 is currently receiving 100% of traffic. The next steps shift that incrementally.
 
 ---
 
@@ -53,16 +54,16 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-The script then sends **20 requests** and prints which version responded:
+The script sends **20 requests** and reports which version responded:
 
 ```
 Request 1:  {"colour":"blue",...}   ← v1
-Request 5:  {"colour":"green",...}  ← v2  ← highlighted in yellow
+Request 5:  {"colour":"green",...}  ← v2
 ...
 v1 responses: 18/20  |  v2 responses: 2/20
 ```
 
-> 💬 *"Βλέπετε; Κάποια requests πάνε στη v1, κάποια στη v2. 90/10 split."*
+> **Tip:** The response `colour` field distinguishes versions. Watch the distribution across 20 requests — it reflects the 90/10 weight.
 
 ---
 
@@ -77,7 +78,7 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> 💬 *"Τώρα 50/50. Παρακολουθούμε metrics. Αν η v2 είναι OK — πάμε 100%."*
+> **Goal:** At this point, observe metrics for both versions in **Observe → Dashboards**. Only promote to 100% once error rates and latency are acceptable.
 
 ---
 
@@ -92,11 +93,11 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> 💬 *"Μετακίνηση ολοκληρώθηκε. Κανένας χρήστης δεν είδε error."*
+> **Take away:** Cutover is instantaneous from the platform's perspective. No users experienced a request error during the transition.
 
 ---
 
-### 5. Emergency rollback (back to v1)
+### 5. Emergency rollback (revert to v1)
 
 ```bash
 oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
@@ -107,28 +108,28 @@ oc patch route ocp-demo-app -n ocp-demo --type=merge -p '{
 }'
 ```
 
-> 💬 *"Rollback: ένα command. Τέλος."*
+> **Take away:** Rollback is a single patch operation. Traffic shifts immediately upon execution.
 
 ---
 
-### 6. Cleanup — v2 removed automatically
-
-At the end of the script, v2 resources are deleted so they don't interfere with later demos:
+### 6. Cleanup — remove v2 resources
 
 ```bash
 oc delete deployment,svc,bc,is ocp-demo-app-v2 -n ocp-demo --ignore-not-found
 ```
 
+v2 resources are removed at script end to avoid interfering with subsequent demos.
+
 ---
 
-## 📌 Recap
+## Recap
 
-| Action | Time | Risk |
-|--------|------|------|
-| Deploy v2 silently | seconds | Zero |
-| Send 10% traffic | 1 command | Minimal |
-| Monitor & grow to 100% | gradual | Controlled |
-| Emergency rollback | 1 command | Instant |
+| Action | Execution time | Risk exposure |
+|---|---|---|
+| Deploy v2 | Seconds | Zero — receives no traffic until weighted |
+| Route 10% to v2 | 1 command | Minimal — 90% still on stable v1 |
+| Graduate to 100% | Gradual — operator-controlled | Controlled |
+| Rollback | 1 command | Immediate |
 
 ---
 

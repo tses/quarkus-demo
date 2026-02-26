@@ -18,6 +18,8 @@ get_console_url() {
 # -----------------------------------------------------------------------------
 # PROJECT / NAMESPACE — change this if you want a different namespace name
 # -----------------------------------------------------------------------------
+export DEMO_PROJECT_CONSOLE="ocp-demo-app-console"
+export DEMO_PROJECT_CONSOLE_DISPLAY="OCP Demo App Console"
 export DEMO_PROJECT="ocp-demo"
 export DEMO_PROJECT_DISPLAY="OCP Introduction Demo"
 

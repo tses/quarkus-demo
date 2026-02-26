@@ -1,41 +1,40 @@
 # ACT 3 — Deployment Strategies
 
-> **Duration:** ~8 minutes  
-> **Script:** `scripts/04-deployment-strategies.sh`  
-> **Wow Factor:** Visual rolling update — pods cycling live in Topology view  
-> **Message:** *"Zero downtime deployment — ενσωματωμένο, όχι custom script."*
+> **Script:** `scripts/04-deployment-strategies.sh`
+> **Goal:** Demonstrate rolling update vs. recreate strategies, rollout history with change tracking, and one-command rollback.
 
 ---
 
-## 🎯 Mental Model First
+## Mental Model
 
-Two strategies, one critical difference:
+Two strategies — one critical behavioural difference:
 
 ```
 RollingUpdate  → new pods UP before old pods DOWN  (zero downtime)
-Recreate       → all old pods DOWN, then new pods UP (brief downtime, needed for DB migrations)
+Recreate       → all old pods DOWN, then new pods UP (brief downtime — required for DB migrations)
 ```
 
-> 💬 *"Η ερώτηση δεν είναι 'ποιο είναι καλύτερο'. Είναι 'τι χρειάζεται η εφαρμογή σας'."*
+> **Gotcha:** The question is not "which strategy is better". It is "what does your application require". Stateless APIs: `RollingUpdate`. Singleton or schema-migration services: `Recreate`.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
-### 1. Show current strategy & explain the parameters
+### 1. Review current strategy and explain the parameters
 
-The script prints an explanation **before** showing the live values:
+Key parameters for `RollingUpdate`:
 
 ```
-maxSurge: 25%       — how many EXTRA pods can run above the desired count during the update
-                      (e.g. 4 replicas → up to 5 pods running at once)
-maxUnavailable: 25% — how many pods can be unavailable at the same time
-                      (e.g. 4 replicas → at least 3 always serving traffic)
+maxSurge: 25%        — maximum EXTRA pods allowed above desired count during update
+                       (e.g. 4 replicas → up to 5 pods running simultaneously)
+
+maxUnavailable: 25%  — maximum pods that may be unavailable during update
+                       (e.g. 4 replicas → at least 3 always serving traffic)
 ```
 
-> 💬 *"maxSurge και maxUnavailable μαζί εγγυώνται zero downtime: τα νέα pods ανεβαίνουν ΠΡΙΝ τα παλιά κατεβούν."*
+> **Take away:** `maxSurge` and `maxUnavailable` together enforce the zero-downtime guarantee: new pods become healthy **before** old pods are terminated.
 
-Then the live deployment config:
+Inspect the live configuration:
 
 ```bash
 oc get deployment ocp-demo-app -n ocp-demo \
@@ -46,68 +45,68 @@ MaxUnavailable: {.spec.strategy.rollingUpdate.maxUnavailable}'
 
 ---
 
-### 2. Trigger a rollout — watch it live
+### 2. Trigger a rollout — observe live in Topology
 
 ```bash
-# Inject APP_VERSION env var — MicroProfile maps app.version → APP_VERSION
-# /api/info will return the new version value after rollout
+# Inject APP_VERSION — MicroProfile maps app.version → APP_VERSION
+# /api/info returns the updated version value after rollout completes
 oc set env deployment/ocp-demo-app APP_VERSION=v<timestamp> -n ocp-demo
 
-# Annotate so rollout history shows a meaningful CHANGE-CAUSE
+# Record a human-readable CHANGE-CAUSE in rollout history
 oc annotate deployment/ocp-demo-app \
   kubernetes.io/change-cause="demo rollout v<timestamp>" --overwrite -n ocp-demo
 ```
 
-Switch to **Topology view** — watch pods cycling (old terminating, new starting).
+Switch to **Topology view** — old pods terminate only after new pods report healthy.
 
-> 💬 *"Βλέπετε τι συμβαίνει; Τα παλιά pods δεν σταματάνε μέχρι τα νέα να είναι healthy. Η εφαρμογή ήταν πάντα available."*
+After rollout: `curl /api/info` returns the updated `"version"` field.
 
-After the rollout, `curl /api/info` returns the updated `"version"` value — proving it works.
+> **Tip:** Verify with `curl` after the rollout completes — the version change confirms end-to-end success.
 
 ---
 
-### 3. Show Rollout History with CHANGE-CAUSE
+### 3. Inspect rollout history with CHANGE-CAUSE
 
 ```bash
 oc rollout history deployment/ocp-demo-app -n ocp-demo
 ```
 
-Each revision now shows a meaningful `CHANGE-CAUSE` annotation.
+Each revision shows the `CHANGE-CAUSE` annotation — providing an auditable deployment log.
 
-> 💬 *"Κάθε deployment καταγράφεται. Μπορούμε να πάμε πίσω σε οποιοδήποτε σημείο."*
+> **Take away:** Every deployment is recorded. Any revision can be targeted for rollback.
 
 ---
 
-### 4. Rollback in one command
+### 4. One-command rollback
 
 ```bash
 oc rollout undo deployment/ocp-demo-app -n ocp-demo
 ```
 
-> 💬 *"Ένα command. Production rollback. Χωρίς panic, χωρίς hotfix."*
+> **Take away:** Instant rollback to the previous revision. No hotfix branch, no re-deploy pipeline.
 
 ---
 
-### 5. Show Recreate strategy (explain only)
+### 5. Recreate strategy (reference — not executed)
 
 ```yaml
 strategy:
   type: Recreate          # ALL old pods stop first → THEN new pods start
-                          # Use when 2 versions CANNOT run simultaneously
-                          # (e.g. DB schema migration)
+                          # Use when two versions CANNOT run simultaneously
+                          # (e.g. DB schema migration, singleton lock)
 ```
 
-> 💬 *"Το Recreate χρησιμοποιείται όταν η εφαρμογή δεν μπορεί να τρέξει δύο εκδόσεις ταυτόχρονα. Ο χρόνος downtime είναι ελεγχόμενος και αναμενόμενος."*
+> **Gotcha:** `Recreate` is not a fallback for when `RollingUpdate` is "too complex". It is the correct choice when running two versions of an application concurrently would corrupt data or violate a constraint.
 
 ---
 
-## 📌 Recap
+## Recap
 
-| Strategy | Downtime | Use When |
-|----------|----------|----------|
-| `RollingUpdate` | Zero | Stateless apps, APIs |
-| `Recreate` | Brief, controlled | DB migrations, singleton apps |
-| Rollback | Instant | Something went wrong |
+| Strategy | Downtime | Use when |
+|---|---|---|
+| `RollingUpdate` | Zero | Stateless apps, REST APIs |
+| `Recreate` | Brief, controlled | DB migrations, singleton services |
+| Rollback | Instant | Revert to previous known-good revision |
 
 ---
 

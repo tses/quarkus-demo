@@ -1,54 +1,50 @@
 # ACT 3 — Self-Healing Pods
 
-> **Duration:** ~4 minutes  
-> **Script:** `scripts/09-self-healing.sh`  
-> **Wow Factor:** Kill a pod live — it comes back on its own. Audience watches it happen.  
-> **Message:** *"Το platform δεν κοιμάται. Παρακολουθεί. Διορθώνει. Μόνο του."*
+> **Script:** `scripts/09-self-healing.sh`
+> **Goal:** Demonstrate the Kubernetes reconciliation loop — the platform detects a missing pod and replaces it automatically, with no manual intervention.
 
 ---
 
-## 🎯 Mental Model First
+## Mental Model
 
-> 💬 *"Σε ένα κλασικό server: αν κρασάρει η εφαρμογή, κάποιος λαμβάνει alert, κάποιος ξυπνά, κάποιος κάνει restart. Με OpenShift — αυτός ο κάποιος είναι το platform."*
-
-OpenShift runs a **reconciliation loop** continuously:
+OpenShift runs a continuous **reconciliation loop**:
 
 ```
 Desired state:  3 pods running
-Actual state:   2 pods running (one died)
-Action:         Create new pod immediately
+Actual state:   2 pods running (one terminated)
+Action:         Immediately schedule a replacement pod
 ```
 
-This is the **self-healing** guarantee built into Kubernetes/OpenShift.
+> **Take away:** The platform does not wait for an alert, an on-call response, or a manual restart. It acts on the divergence between desired and actual state within seconds.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
-### 1. Starting state — 3 pods running
+### 1. Verify starting state — 3 pods running
 
-Script 08 ends with 3 replicas — this demo starts directly from that state.
+Script 08 ends with 3 replicas. This demo starts directly from that state.
 
 ```bash
 oc get pods -l app=ocp-demo-app -n ocp-demo
 ```
 
-Point to the **dark blue rings** on all pods.
-
-> 💬 *"Τρία pods. Όλα healthy. Ας δούμε τι γίνεται αν ένα 'πεθάνει'."*
+Confirm: all 3 pods show `Running` status and dark blue rings in **Topology**.
 
 ---
 
-### 2. Open a split view (CLI + Console)
+### 2. Prepare a split view
 
-- **Left screen / tab:** Topology view (watching visually)
-- **Right screen / tab:** Terminal running the script
+- **Left:** Topology view (visual — watch pod count change)
+- **Right:** Terminal running the script
+
+> **Tip:** The visual contrast between a missing pod ring and its replacement appearing is the clearest way to show the reconciliation cycle to an audience.
 
 ---
 
-### 3. ⚡ THE MOMENT — Kill a pod
+### 3. Delete a pod
 
-The script highlights the pod about to be deleted:
+The script highlights the target pod before deletion:
 
 ```
 ╔══════════════════════════════════════╗
@@ -60,15 +56,13 @@ The script highlights the pod about to be deleted:
 oc delete pod <pod-name> -n ocp-demo
 ```
 
-**Immediately switch attention to the Topology view.**
+Switch focus to the Topology view immediately after execution.
 
-> 💬 *"Σκότωσα το pod. Μπροστά σας."*
-
-**Pause. Let the audience watch.**
+> **Goal:** The pod disappears from the topology. Within seconds, a replacement pod starts its initialisation cycle.
 
 ---
 
-### 4. Watch it recover in real-time
+### 4. Observe recovery — live polling output
 
 The script polls every 2 seconds for 30 seconds:
 
@@ -78,53 +72,55 @@ The script polls every 2 seconds for 30 seconds:
 [t+6s]  Running pods: 3/3  ✅
 ```
 
-> 💬 *"Είδατε; Δύο δευτερόλεπτα. Το platform το είδε. Έφτιαξε νέο pod. Η εφαρμογή δεν είδε ποτέ downtime."*
+> **Take away:** Total recovery time is typically under 10 seconds for a pre-pulled image. No human action was required at any point.
 
 ---
 
-### 5. Show the new pod (different name = genuinely new)
+### 5. Confirm the replacement is a new pod
 
 ```bash
 oc get pods -l app=ocp-demo-app -n ocp-demo
 # NAME                        STATUS    RESTARTS   AGE
-# ocp-demo-app-xxx-abc12      Running   0          12m
-# ocp-demo-app-xxx-def34      Running   0          12m
-# ocp-demo-app-xxx-xyz99      Running   0          8s   ← NEW
+# ocp-demo-app-xxx-abc12      Running   0          14m
+# ocp-demo-app-xxx-def34      Running   0          14m
+# ocp-demo-app-xxx-xyz99      Running   0          9s   ← NEW
 ```
 
-> 💬 *"Νέο pod. Νέο όνομα. Ίδια εφαρμογή. Αυτό συμβαίνει automatically, 24/7, 365 ημέρες."*
+> **Gotcha:** The new pod has a different name — it is a genuinely new container, not a restart of the original. The `AGE` field confirms this. This distinction matters for stateless applications: the Deployment spec is what persists, not the individual pod.
 
 ---
 
-### 6. Verify — app never went down
+### 6. Verify — no downtime
 
 ```bash
-curl http://<route>/api/info   # still responds — no downtime
+curl http://<route>/api/info   # returns 200 — application was never unavailable
 ```
 
 ---
 
-## 🎬 Closing Line for the Entire Demo
+## Closing Statement
 
-> 💬 *"Αυτό που είδατε σήμερα — S2I, canary deployments, self-healing, monitoring, operators — δεν είναι το μέλλον. Τρέχει σε production, σε εταιρείες που γνωρίζετε, σήμερα. Το ερώτημα δεν είναι 'αν'. Είναι 'πότε'."*
-
----
-
-## 📌 The Full Arc — Recap
-
-| What happened | Why it matters |
-|--------------|----------------|
-| Git URL → Live HTTPS app (S2I) | Developer productivity × 10 |
-| Traffic split with weights | Zero-risk production releases |
-| Pod killed → auto-replaced | No on-call for crashes |
+> The capabilities demonstrated in this session — S2I builds, canary deployments, self-healing, monitoring, and Operators — are production-deployed features, not experimental. The question for adoption is one of timing, not feasibility.
 
 ---
 
-## 🏁 End of Demo
+## Full Demo Recap
 
-Thank the audience. Open for Q&A.
+| Demonstrated | Outcome |
+|---|---|
+| Git URL → live HTTPS app (S2I) | Full build-deploy pipeline from source |
+| Traffic split with weights | Zero-risk canary release pattern |
+| Pod killed → auto-replaced | No manual recovery or alerting required |
+| Prometheus scraping + probes | Observability and health management built in |
+| HPA under real CPU load | Automatic horizontal scaling from metrics |
+| Postgres Operator | Day-2 database operations encoded as automation |
 
-Suggested follow-up actions:
-- **Red Hat Developer Sandbox** (free): [developers.redhat.com/developer-sandbox](https://developers.redhat.com/developer-sandbox)
-- **OpenShift Interactive Learning** (free, browser-based labs): [developers.redhat.com/learn](https://developers.redhat.com/learn)
+---
+
+## End of Demo
+
+Suggested follow-up resources:
+
+- **Red Hat Developer Sandbox** (free cluster): [developers.redhat.com/developer-sandbox](https://developers.redhat.com/developer-sandbox)
+- **OpenShift Interactive Learning** (browser-based labs): [developers.redhat.com/learn](https://developers.redhat.com/learn)
 - Internal next step: pilot project scoping session

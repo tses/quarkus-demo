@@ -1,34 +1,39 @@
 # ACT 3 — Deploying the Postgres Operator
 
-> **Duration:** ~8 minutes  
-> **Script:** `scripts/06-operator-postgres.sh` (CLI verification after console install)  
-> **Wow Factor:** Production-grade database in 2 clicks — no DBA, no ticket, no waiting  
-> **Message:** *"Operators φέρνουν Day-2 operations μέσα στο platform."*
+> **Script:** `scripts/06-operator-postgres.sh` (CLI verification after console install)
+> **Goal:** Demonstrate the Operator pattern — provisioning a production-grade PostgreSQL cluster via a custom resource, with no manual DBA steps.
 
 ---
 
-## 🎯 Mental Model First
+## Mental Model
 
 **What is an Operator?**
 
-> An Operator is a Kubernetes controller that encodes **human operational knowledge** into software.
+> An Operator is a Kubernetes controller that encodes **operational knowledge** — install, configure, backup, failover, upgrade — as automated reconciliation logic.
 
-> 💬 *"Φανταστείτε έναν έμπειρο DBA που ξέρει πώς να στήσει Postgres, να κάνει backup, failover, και upgrade — και τον 'έχετε' πάντα available, 24/7, automated. Αυτός είναι ο Operator."*
+**Without an Operator:**
+- Deploy a DB container manually
+- Write and maintain backup scripts
+- Handle failover and credential rotation manually
+- Manage upgrades with risk of data loss
 
-**Without Operator:** Deploy DB container → configure manually → write backup scripts → handle failover manually.  
-**With Operator:** Define what you want → Operator handles everything else.
+**With an Operator:**
+- Declare the desired state in a Custom Resource (CR)
+- The Operator reconciles actual state to match declared state — continuously
+
+> **Take away:** An Operator replaces a human operator for Day-2 tasks. It is always available, always consistent, and does not require a support ticket.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
 ### 1. Navigate to OperatorHub (Console)
 
-Navigate to: **Administrator → Operators → OperatorHub**
+Navigate to: **Operators → OperatorHub**
 
 Search for: `PostgreSQL`
 
-> 💬 *"Το OperatorHub είναι marketplace από certified operators. Red Hat, community, ISVs."*
+> **Tip:** OperatorHub lists Red Hat certified, community, and ISV operators. The certification level indicates the level of support and testing.
 
 Select **Crunchy Postgres for Kubernetes**.
 
@@ -37,23 +42,28 @@ Select **Crunchy Postgres for Kubernetes**.
 ### 2. Install the Operator
 
 Click **Install** → review settings:
-- **Installation Mode:** A specific namespace (`ocp-demo`)
-- **Update Channel:** stable
-- **Approval Strategy:** Automatic
 
-Click **Install** again. Then return to the terminal.
+| Setting | Value |
+|---|---|
+| Installation Mode | Specific namespace (`ocp-demo`) |
+| Update Channel | stable |
+| Approval Strategy | Automatic |
+
+Click **Install**. Return to the terminal once installation begins.
 
 ---
 
-### 3. Verify operator is installed
+### 3. Verify operator installation
 
 ```bash
 oc get csv -n ocp-demo | grep -i postgres
 ```
 
+Wait for `PHASE: Succeeded` before proceeding.
+
 ---
 
-### 4. Create a PostgresCluster CR
+### 4. Create a PostgresCluster custom resource
 
 ```yaml
 apiVersion: postgres-operator.crunchydata.com/v1beta1
@@ -83,42 +93,42 @@ spec:
                   storage: 1Gi
 ```
 
-> 💬 *"Αυτό το YAML είναι η 'επιθυμία' μας. Ο Operator κάνει τα υπόλοιπα — pods, secrets, services, storage."*
+> **Goal:** This YAML expresses *what* is needed. The Operator determines *how* to provision it — pods, PVCs, services, secrets — and maintains that state going forward.
 
 ---
 
-### 5. Watch it come up
+### 5. Watch the cluster come up
 
-Navigate to: **Developer → Topology** — Postgres pods appear (~60s)
+Navigate to: **Topology** — Postgres pods appear within ~60 seconds.
 
 ```bash
 oc get pods -l postgres-operator.crunchydata.com/cluster=demo-db -n ocp-demo
 ```
 
-> 💬 *"Ο Operator έφτιαξε: postgres pod, backup sidecar, secrets με credentials. Αυτόματα."*
+> **Tip:** The Operator creates: the Postgres pod, a pgBackRest sidecar for backups, and a Kubernetes `Secret` containing connection credentials — all from the single CR above.
 
 ---
 
-### 6. Show the connection secret
+### 6. Inspect the connection secret
 
 ```bash
 oc get secret demo-db-pguser-demo-db -n ocp-demo \
   -o jsonpath='{.data.uri}' | base64 -d
 ```
 
-> 💬 *"Η εφαρμογή μας μπορεί να χρησιμοποιήσει αυτό το secret. Το password δεν το ξέρει κανείς — διαχειρίζεται ο Operator."*
+> **Take away:** Applications consume this secret as an environment variable. No developer or operator needs to know the credentials — the Operator generates and rotates them.
 
 ---
 
-## 📌 Recap
+## Recap
 
-| Χωρίς Operator | Με Operator |
-|----------------|-------------|
-| Manual install & config | 2 clicks |
-| Custom backup scripts | Built-in |
-| Manual failover | Automated |
-| You manage credentials | Operator manages secrets |
-| Upgrades = risk | Controlled rolling upgrades |
+| Without Operator | With Operator |
+|---|---|
+| Manual installation and configuration | Installed via OperatorHub in 2 clicks |
+| Custom backup scripts | Built-in pgBackRest integration |
+| Manual failover procedures | Automated reconciliation |
+| Manual credential management | Operator-managed secrets |
+| Upgrades are high-risk, manual | Controlled rolling upgrades |
 
 ---
 

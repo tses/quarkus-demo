@@ -1,35 +1,34 @@
-# 🚀 OpenShift Introduction — Hands-On Demo Guide
+# OpenShift Introduction — Hands-On Demo Guide
 
-> **Audience:** Ops/Sysadmins & Developers with no prior OpenShift experience  
-> **Format:** Instructor-led live demo (no participant access required)  
-> **Goal:** Show what's possible — platform capabilities, not just features  
+> **Audience:** Ops/Sysadmins & Developers with no prior OpenShift experience
+> **Format:** Instructor-led live demo (no participant cluster access required)
+> **Goal:** Demonstrate platform capabilities end-to-end — from source code to a production-grade, observable, self-healing application
 > **Total Time:** ~60–75 minutes
 
 ---
 
-## 🎭 The Story We're Telling
+## Demo Narrative
 
-> *"From source code on GitHub to a production-grade, self-healing, observable, 
-> zero-downtime-deployable application — in under 10 minutes."*
+> *"From a Git URL to a production-grade, self-healing, observable, zero-downtime-deployable application — in under 10 minutes. The remaining 60 minutes show what the platform does for you after that."*
 
-Every step has a deliberate message. Pace yourself. Let the audience absorb each one.
-
----
-
-## 🏗️ Demo Arc — Three Acts
-
-| Act | Theme | Message | Duration |
-|-----|-------|---------|----------|
-| **ACT 1** | Orientation | *"This platform has a cockpit — and it makes sense"* | ~10 min |
-| **ACT 2** | Build & Deploy | *"Code → Running App. No Dockerfile. No YAML. No ops ticket."* | ~20 min |
-| **ACT 3** | Platform Power | *"Features that would take months to build — out of the box"* | ~35 min |
+Each step has a deliberate technical message. Maintain pace discipline — allow the audience time to register each point before advancing.
 
 ---
 
-## 📋 Demo Steps
+## Demo Arc — Three Acts
 
-| # | Step | Section | Time |
-|---|------|---------|------|
+| Act | Theme | Message |
+|---|---|---|
+| **ACT 1** | Orientation | The platform has a structured cockpit — distinct views for developers and administrators |
+| **ACT 2** | Build & Deploy | Source code to running application — no Dockerfile, no YAML, no infrastructure ticket |
+| **ACT 3** | Platform Capabilities | Production features that would require months of custom tooling — built in and operational by default |
+
+---
+
+## Demo Steps
+
+| # | Step | Act | Time |
+|---|---|---|---|
 | 1 | [Console Tour](01-console-tour.md) | ACT 1 | 10 min |
 | 2 | [Deploy with S2I](02-deploy-s2i.md) | ACT 2 | 10 min |
 | 3 | [Pods / Service / Route](03-pods-svc-route.md) | ACT 2 | 10 min |
@@ -42,36 +41,36 @@ Every step has a deliberate message. Pace yourself. Let the audience absorb each
 
 ---
 
-## 🛠️ Prerequisites & Pre-Demo Checklist
+## Prerequisites & Pre-Demo Checklist
 
-Before entering the room, verify:
+Verify the following before starting:
 
-- [ ] `oc login` works on your machine
-- [ ] Project/namespace created: `oc new-project ocp-demo`
-- [ ] GitHub repo URL ready: `https://github.com/tses/quarkus-demo`
+- [ ] `oc login` succeeds on the demo machine
+- [ ] Project/namespace exists: `oc new-project ocp-demo`
+- [ ] GitHub repo URL accessible: `https://github.com/tses/quarkus-demo`
 - [ ] Browser tabs pre-opened: OCP Console, GitHub repo
-- [ ] OperatorHub accessible (for Postgres operator)
-- [ ] Screen font size increased for readability (min 16pt terminal)
-- [ ] Notifications silenced 🔇
+- [ ] OperatorHub accessible (required for Postgres operator section)
+- [ ] Terminal font size set for readability (minimum 16pt)
+- [ ] System notifications silenced 🔇
 
 ---
 
-## 💬 Key Phrases Bank
+## Key Talking Points
 
-| Context | Say this |
-|---------|----------|
-| Opening | *"Ξεχάστε το 'it works on my machine'. Μιλάμε για ένα platform που το κάνει standard."* |
-| After S2I | *"Αυτό που μόλις είδατε, σε ένα κλασικό setup παίρνει sprint να στηθεί."* |
-| After self-healing | *"Ο platform engineer σας κοιμάται ήσυχος."* |
-| Closing | *"Αυτό δεν είναι το μέλλον. Τρέχει production σήμερα, σε εταιρείες που γνωρίζετε."* |
+| Context | Point |
+|---|---|
+| Opening | The platform standardises what "it works in production" means — not just on one machine. |
+| After S2I | The same three CLI commands run in any CI/CD pipeline. The console is one interface to the same API. |
+| After self-healing | The reconciliation loop runs continuously — not on a cron schedule, not triggered by an alert. |
+| Closing | These are production-deployed capabilities in use at scale today. The adoption question is one of timing. |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 demo/
-├── README.md                      ← You are here (master guide)
+├── README.md                      ← Master guide (this file)
 ├── 01-console-tour.md
 ├── 02-deploy-s2i.md
 ├── 03-pods-svc-route.md

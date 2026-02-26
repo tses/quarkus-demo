@@ -66,6 +66,7 @@ echo ""
 for i in $(seq 1 5); do
   RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response")
   echo -e "  Request ${i}: ${CYAN}${RESP}${RESET}"
+  sleep 0.5
 done
 echo ""
 pause
@@ -109,6 +110,7 @@ for i in $(seq 1 20); do
     echo -e "  Request ${i}: ${CYAN}${RESP}${RESET}  ← v1 (blue)"
     V1_COUNT=$((V1_COUNT + 1))
   fi
+  sleep 0.5
 done
 echo ""
 echo -e "  v1 responses: ${GREEN}${V1_COUNT}/20${RESET}  |  v2 responses: ${YELLOW}${V2_COUNT}/20${RESET}"
@@ -142,6 +144,7 @@ for i in $(seq 1 10); do
   else
     echo -e "  Request ${i}: ${CYAN}${RESP}${RESET}  ← v1 (blue)"
   fi
+  sleep 0.5
 done
 pause
 
@@ -169,6 +172,7 @@ step "Verify — all requests now hit v2 (colour=green):"
 for i in $(seq 1 5); do
   RESP=$(curl -sf "http://${ROUTE_URL}/api/info" 2>/dev/null || echo "no response")
   echo -e "  Request ${i}: ${YELLOW}${BOLD}${RESP}${RESET}"
+  sleep 0.5
 done
 echo ""
 pause

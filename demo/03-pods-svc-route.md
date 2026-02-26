@@ -1,14 +1,12 @@
 # ACT 2 — Pods / Service / Route
 
-> **Duration:** ~10 minutes  
-> **Wow Factor:** Visual topology — living architecture diagram, auto-updated  
-> **Message:** *"Το OpenShift δεν κρύβει την πολυπλοκότητα — την οργανώνει."*
+> **Goal:** Establish a clear mental model of the three core Kubernetes networking primitives before exploring them in the console.
 
 ---
 
-## 🎯 The Three Primitives
+## The Three Primitives
 
-Before showing the UI, give a **30-second mental model**:
+**30-second mental model — establish this before touching the UI:**
 
 ```
 Pod          → the running process (your app, in a container)
@@ -16,33 +14,34 @@ Service      → stable internal address for a group of pods
 Route        → public URL that points to the Service
 ```
 
-> 💬 *"Φανταστείτε το σαν εστιατόριο: το Pod είναι ο σεφ, το Service είναι το ταμείο, το Route είναι η πόρτα που βλέπει ο κόσμος."*
+> **Tip:** An analogy: Pod = the kitchen, Service = the order counter, Route = the front door. The kitchen changes; the counter address stays the same.
 
 ---
 
-## 🖥️ Steps
+## Steps
 
-### 1. Topology View — The Living Diagram
+### 1. Topology View — The Live Diagram
 
-Navigate to: **Developer → Topology**
+Navigate to: **Topology**
 
 Point out:
-- The app node (circle) — tap it to expand
-- The **dark blue ring** = pod is running and healthy
-- The **arrow icon** (top-right of node) = Route URL
+- The app node (circle) — click to expand
+- **Dark blue ring** = pod is running and healthy
+- **Arrow icon** (top-right of node) = Route URL
 
-> 💬 *"Αυτό δεν είναι static diagram. Αλλάζει real-time καθώς τα pods ανεβοκατεβαίνουν."*
+> **Take away:** The Topology view is not a static diagram. It reflects actual cluster state — updated in real time as pods start, stop, or fail.
 
 ---
 
 ### 2. Click the App Node → Side Panel
 
 Show the side panel tabs:
-- **Details** — replicas, labels, image
-- **Resources** — pods list, services, routes
-- **Observe** — mini metrics inline
 
-Click on the **Pod name** in Resources tab.
+- **Details** — replicas, labels, image reference
+- **Resources** — pod list, services, routes
+- **Observe** — inline metrics preview
+
+Click on the **Pod name** in the Resources tab.
 
 ---
 
@@ -51,36 +50,38 @@ Click on the **Pod name** in Resources tab.
 Navigate to: Pod detail page
 
 Show tabs:
-- **Details** — node it runs on, status, IP
-- **Logs** — live application logs
-- **Terminal** — shell INTO the running container
+
+- **Details** — which node it runs on, current status, pod IP
+- **Logs** — live application output
+- **Terminal** — interactive shell into the running container
 
 ```bash
-# Click "Terminal" tab — open a shell in the pod
+# Terminal tab — shell into the running container
 ls /deployments
 cat /etc/os-release
 ```
 
-> 💬 *"Μπορούμε να μπούμε μέσα σε ένα running container από το browser. Χωρίς SSH. Χωρίς VPN. Για debug — αυτό είναι χρυσός."*
+> **Gotcha:** Browser-based shell access requires no SSH and no VPN. This is the standard debugging path for containerised workloads — not a workaround.
 
 ---
 
 ### 4. Show the Service
 
-Navigate to: **Developer → Project → Services** (or from Resources tab)
+Navigate to: **Project → Services** (or via Resources tab)
 
 ```bash
 # CLI equivalent
 oc get svc
-oc describe svc my-app
+oc describe svc ocp-demo-app
 ```
 
 Point out:
-- ClusterIP (internal only)
-- Port mapping
-- Selector (how it finds its pods)
 
-> 💬 *"Το Service δεν ξέρει τίποτα για pods. Απλώς ρωτά: 'ποιος έχει αυτό το label;' Εκεί στέλνει traffic."*
+- `ClusterIP` — internal address only, not reachable from outside the cluster
+- Port mapping
+- `selector` field — how the Service identifies its target pods
+
+> **Gotcha:** A Service has no direct knowledge of specific pods. It queries: *"which pods carry this label?"* — and routes to whatever matches. This is label-based discovery, not hardcoded references.
 
 ---
 
@@ -90,25 +91,26 @@ Navigate to: **Networking → Routes**
 
 ```bash
 # CLI equivalent
-oc get route my-app
-oc describe route my-app
+oc get route ocp-demo-app
+oc describe route ocp-demo-app
 ```
 
 Point out:
-- **TLS termination** — HTTPS out of the box ✅
-- The host URL pattern: `<app>-<project>.<cluster-domain>`
 
-> 💬 *"HTTPS certificate — αυτόματο. Δεν χρειάστηκε να ρυθμίσει κανείς τίποτα."*
+- **TLS termination** — HTTPS enabled automatically ✅
+- Host URL pattern: `<app>-<project>.<cluster-domain>`
+
+> **Take away:** HTTPS termination requires zero manual certificate management. The cluster handles provisioning and renewal.
 
 ---
 
-## 📌 Recap
+## Recap
 
-| Concept | Αναλογία | Key insight |
-|---------|----------|-------------|
-| Pod | Ο σεφ | Εφήμερο — can die & be replaced |
-| Service | Το ταμείο | Stable — always findable |
-| Route | Η πόρτα | Public — HTTPS automatic |
+| Concept | Mental model | Key behaviour |
+|---|---|---|
+| Pod | Running process | Ephemeral — can be replaced at any time |
+| Service | Stable endpoint | Always addressable — decouples clients from pod lifecycle |
+| Route | Public ingress | HTTPS automatic — no cert management required |
 
 ---
 
