@@ -66,6 +66,9 @@ step "Exposing service as HTTPS Route..."
 show_cmd "oc expose svc/${APP_NAME}
   -n ${DEMO_PROJECT}"
 oc expose svc/"${APP_NAME}" -n "${DEMO_PROJECT}" 2>/dev/null || true
+oc annotate route "${APP_NAME}" \
+  haproxy.router.openshift.io/timeout=120s \
+  -n "${DEMO_PROJECT}" --overwrite
 
 # Get the route URL
 ROUTE_URL=$(oc get route "${APP_NAME}" -n "${DEMO_PROJECT}" \

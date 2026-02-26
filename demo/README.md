@@ -35,8 +35,8 @@ Each step carries a deliberate technical message. Maintain pace discipline — a
 | 4 | [Deployment Strategies](04-deployment-strategies.md) | `scripts/04-deployment-strategies.sh` | ACT 3 | 8 min |
 | 5 | [Traffic Splitting](05-traffic-splitting.md) | `scripts/05-traffic-splitting.sh` | ACT 3 | 8 min |
 | 6 | [Deploy Postgres Operator](06-operator-postgres.md) | `scripts/06-operator-postgres.sh` | ACT 3 | 8 min |
-| 7 | [Resource Requests & Limits](07-resources.md) | `scripts/07-resources.sh` | ACT 3 | 7 min |
-| 8 | [Health Probes](08-probes.md) | `scripts/08-probes.sh` | ACT 3 | 7 min |
+| 7 | [Health Probes](07-probes.md) | `scripts/07-probes.sh` | ACT 3 | 7 min |
+| 8 | [Resource Requests & Limits](08-resources.md) | `scripts/08-resources.sh` | ACT 3 | 7 min |
 | 9 | [Monitoring — ServiceMonitor](09-monitoring.md) | `scripts/09-monitoring.sh` | ACT 3 | 5 min |
 | 10 | [Scaling Out](10-scaling.md) | `scripts/10-scaling.sh` | ACT 3 | 5 min |
 | 11 | [Self-Healing Pods](11-self-healing.md) | `scripts/11-self-healing.sh` | ACT 3 | 4 min |
@@ -81,8 +81,8 @@ demo/
 ├── 04-deployment-strategies.md
 ├── 05-traffic-splitting.md
 ├── 06-operator-postgres.md
-├── 07-resources.md                ← Resource requests & limits (CPU throttle demo)
-├── 08-probes.md                   ← Liveness & readiness probes (live failure demo)
+├── 07-probes.md                   ← Liveness & readiness probes (live failure demo)
+├── 08-resources.md                ← Resource requests & limits (CPU throttle demo)
 ├── 09-monitoring.md               ← ServiceMonitor / Prometheus scraping
 ├── 10-scaling.md                  ← Manual scale + HPA
 └── 11-self-healing.md             ← Pod deletion + reconciliation loop
@@ -95,8 +95,8 @@ scripts/
 ├── 04-deployment-strategies.sh
 ├── 05-traffic-splitting.sh
 ├── 06-operator-postgres.sh
-├── 07-resources.sh                ← Resource requests & limits
-├── 08-probes.sh                   ← Health probes
+├── 07-probes.sh                   ← Health probes
+├── 08-resources.sh                ← Resource requests & limits
 ├── 09-monitoring.sh               ← ServiceMonitor
 ├── 10-scaling.sh                  ← Manual scale + HPA
 ├── 11-self-healing.sh             ← Self-healing demo

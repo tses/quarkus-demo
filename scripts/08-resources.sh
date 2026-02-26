@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 07-resources.sh — Resource Requests & Limits: scheduling, throttling, OOMKill
+# 08-resources.sh — Resource Requests & Limits: scheduling, throttling, OOMKill
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
@@ -63,8 +63,8 @@ header "PART 3 — Patch resource requests + limits"
 
 step "Setting requests + limits on deployment/${APP_NAME}:"
 show_cmd "oc set resources deployment/${APP_NAME} -n ${DEMO_PROJECT}
-  --requests=cpu=100m,memory=256Mi
-  --limits=cpu=500m,memory=512Mi"
+  --requests=cpu=100m,memory=512Mi
+  --limits=cpu=1000m,memory=1024Mi"
 
 oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=json \
@@ -73,8 +73,8 @@ oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
       "op": "replace",
       "path": "/spec/template/spec/containers/0/resources",
       "value": {
-        "requests": {"cpu": "100m", "memory": "256Mi"},
-        "limits":   {"cpu": "500m", "memory": "512Mi"}
+        "requests": {"cpu": "100m", "memory": "512Mi"},
+        "limits":   {"cpu": "1000m", "memory": "1024Mi"}
       }
     }
   ]'
@@ -96,57 +96,103 @@ pause
 header "PART 4 — Live demo: CPU limit in action"
 
 cat <<'MSG'
-  Strategy:
-    1. Set a very tight CPU limit (100m = 0.1 core)
-    2. Call /api/burn?seconds=20  →  app tries to saturate all cores
-    3. Watch oc adm top — usage is CAPPED at the limit
-    4. App stays alive (CPU throttle ≠ kill)
-    5. Restore a sensible limit afterwards
+  Strategy (two rounds — same workload, different CPU limit):
+
+    Round 1 — limit = 1000m  (1 full core — generous)
+      • /api/burn?seconds=60 runs in background
+      • Pod gets up to 1 core → completes in ~60 s wall-clock time
+
+    Round 2 — limit = 500m  (tight — half a core)
+      • Same /api/burn?seconds=60 request
+      • Kernel throttles the container to 0.5 core
+      • Same burn takes noticeably longer (visible in oc adm top)
+      • Pod stays ALIVE — throttling ≠ killing
 MSG
 echo ""
 pause
 
-step "Temporarily tightening CPU limit to 100m to demonstrate throttling:"
-show_cmd "oc set resources deployment/${APP_NAME} -n ${DEMO_PROJECT}
-  --requests=cpu=100m,memory=256Mi
-  --limits=cpu=100m,memory=512Mi"
+# ── Round 1 — 1000m (already set by PART 3) ──────────────────────────────────
+header "PART 4a — Round 1: CPU limit = 1000m (current setting)"
 
-oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
-  --type=json \
-  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"100m","memory":"256Mi"},"limits":{"cpu":"100m","memory":"512Mi"}}}]'
-
-wait_for_deployment "${APP_NAME}"
+step "Current limit is already 1000m (set in PART 3). Confirm:"
+oc get deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
+  -o jsonpath='  cpu request={.spec.template.spec.containers[0].resources.requests.cpu}  limit={.spec.template.spec.containers[0].resources.limits.cpu}{"\n"}'
 echo ""
 
 if [[ -n "${ROUTE_URL}" ]]; then
-  step "Firing /api/burn?seconds=20 (non-blocking — runs in background):"
-  show_cmd "curl -s http://${ROUTE_URL}/api/burn?seconds=20 &"
-  curl -s "http://${ROUTE_URL}/api/burn?seconds=20" &
+  step "Firing /api/burn?seconds=60 with 1000m limit (background):"
+  show_cmd "curl -s \"http://${ROUTE_URL}/api/burn?seconds=60\" &"
+  curl -s "http://${ROUTE_URL}/api/burn?seconds=60" &
   BURN_PID=$!
 
   echo ""
-  echo -e "  ${CYAN}Polling oc adm top pod every 3 s for 24 s — watch CPU stay at/below 100m:${RESET}"
+  echo -e "  ${CYAN}Polling oc adm top pod every 5 s for 60 s — CPU should reach ~1000m:${RESET}"
   echo ""
-  for i in $(seq 1 8); do
-    sleep 3
-    echo -n "  [t+$((i*3))s]  "
+  for i in $(seq 1 10); do
+    sleep 5
+    echo -n "  [t+$((i*5))s]  "
     oc adm top pod -n "${DEMO_PROJECT}" -l "app=${APP_NAME}" --no-headers 2>/dev/null || echo "(metrics warming up)"
   done
+  # Let burn finish in background while we continue the demo
   wait "${BURN_PID}" 2>/dev/null || true
   echo ""
-  ok "Burn complete — pod kept running (throttled, not killed)"
+  ok "Round 1 done — burn completed quickly at 1000m limit"
 else
   warn "No route found — skipping live burn demo"
 fi
 echo ""
 pause
 
-step "Restoring sensible CPU limit (500m):"
+# ── Round 2 — 500m (tight) ────────────────────────────────────────────────────
+header "PART 4b — Round 2: CPU limit = 500m (tight — demonstrating throttle)"
+
+step "Tightening CPU limit to 500m:"
+show_cmd "oc set resources deployment/${APP_NAME} -n ${DEMO_PROJECT}
+  --requests=cpu=100m,memory=512Mi
+  --limits=cpu=500m,memory=1024Mi"
+
 oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
   --type=json \
-  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"100m","memory":"256Mi"},"limits":{"cpu":"500m","memory":"512Mi"}}}]'
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"100m","memory":"512Mi"},"limits":{"cpu":"500m","memory":"1024Mi"}}}]'
+
 wait_for_deployment "${APP_NAME}"
-ok "Limits restored: cpu=100m/500m  memory=256Mi/512Mi"
+echo ""
+
+if [[ -n "${ROUTE_URL}" ]]; then
+  step "Firing the SAME /api/burn?seconds=60 with 500m limit (background):"
+  show_cmd "curl -s \"http://${ROUTE_URL}/api/burn?seconds=60\" &"
+  curl -s "http://${ROUTE_URL}/api/burn?seconds=60" &
+  BURN_PID=$!
+
+  echo ""
+  echo -e "  ${CYAN}Polling oc adm top pod every 5 s for 60 s — CPU is CAPPED at 500m:${RESET}"
+  echo ""
+  for i in $(seq 1 10); do
+    sleep 5
+    echo -n "  [t+$((i*5))s]  "
+    oc adm top pod -n "${DEMO_PROJECT}" -l "app=${APP_NAME}" --no-headers 2>/dev/null || echo "(metrics warming up)"
+  done
+  wait "${BURN_PID}" 2>/dev/null || true
+  echo ""
+  ok "Round 2 done — pod kept running (throttled, not killed)"
+  echo ""
+  echo -e "  ${YELLOW}Key takeaway: same 60-second burn request took MUCH longer wall-clock${RESET}"
+  echo -e "  ${YELLOW}time at 500m because the kernel limits CPU cycles given to the container.${RESET}"
+else
+  warn "No route found — skipping live burn demo"
+fi
+echo ""
+pause
+
+step "Restoring sensible CPU limit (1000m):"
+show_cmd "oc set resources deployment/${APP_NAME} -n ${DEMO_PROJECT}
+  --requests=cpu=100m,memory=512Mi
+  --limits=cpu=1000m,memory=1024Mi"
+oc patch deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
+  --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"100m","memory":"512Mi"},"limits":{"cpu":"1000m","memory":"1024Mi"}}}]'
+wait_for_deployment "${APP_NAME}"
+ok "Limits restored: cpu request=100m limit=1000m  memory=512Mi/1024Mi"
 echo ""
 pause
 
@@ -192,5 +238,5 @@ echo ""
 echo -e "  ${YELLOW}→ Console: Observe → Dashboards → Kubernetes/Compute Resources/Namespace (Pods)${RESET}"
 echo -e "  ${YELLOW}  Each pod bar shows: actual / request / limit${RESET}"
 echo ""
-ok "Resources demo complete — next: Health Probes (08-probes.sh)"
+ok "Resources demo complete — next: Monitoring (09-monitoring.sh)"
 echo ""

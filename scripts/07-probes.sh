@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 08-probes.sh — Liveness & Readiness Probes: explain & show configuration
+# 07-probes.sh — Liveness & Readiness Probes: explain, apply & verify
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/demo-config.sh"
@@ -38,7 +38,7 @@ echo ""
 pause
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PART 2 — Show current probe state (read-only)
+# PART 2 — Show current probe state (before applying)
 # ─────────────────────────────────────────────────────────────────────────────
 header "PART 2 — Current probe configuration on deployment/${APP_NAME}"
 
@@ -97,9 +97,74 @@ echo ""
 pause
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PART 4 — What failure events look like
+# PART 4 — Apply probes with oc patch
 # ─────────────────────────────────────────────────────────────────────────────
-header "PART 4 — What probe failures look like in practice"
+header "PART 4 — Apply liveness & readiness probes to deployment/${APP_NAME}"
+
+cat <<'MSG'
+  "oc set probe" is the idiomatic OCP command for adding/updating probes.
+  It modifies the Deployment in-place and triggers a new rolling update.
+MSG
+echo ""
+
+show_cmd "oc set probe deployment/${APP_NAME} -n ${DEMO_PROJECT} \\
+  --liveness  --get-url=http://:8080/q/health/live  \\
+  --initial-delay-seconds=10 --period-seconds=10 --failure-threshold=3"
+
+oc set probe deployment/"${APP_NAME}" -n "${DEMO_PROJECT}" \
+  --liveness  --get-url=http://:8080/q/health/live \
+  --initial-delay-seconds=10 --period-seconds=10 --failure-threshold=3
+
+ok "livenessProbe set"
+echo ""
+
+show_cmd "oc set probe deployment/${APP_NAME} -n ${DEMO_PROJECT} \\
+  --readiness --get-url=http://:8080/q/health/ready \\
+  --initial-delay-seconds=5  --period-seconds=5  --failure-threshold=3"
+
+oc set probe deployment/"${APP_NAME}" -n "${DEMO_PROJECT}" \
+  --readiness --get-url=http://:8080/q/health/ready \
+  --initial-delay-seconds=5  --period-seconds=5  --failure-threshold=3
+
+ok "readinessProbe set — rolling update triggered"
+echo ""
+
+wait_for_deployment "${APP_NAME}"
+echo ""
+pause
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 5 — Verify probes are now present
+# ─────────────────────────────────────────────────────────────────────────────
+header "PART 5 — Verify probe configuration after patch"
+
+step "livenessProbe (after patch):"
+echo ""
+oc get deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
+  -o jsonpath='{.spec.template.spec.containers[0].livenessProbe}' | \
+  python3 -m json.tool
+echo ""
+
+step "readinessProbe (after patch):"
+echo ""
+oc get deployment "${APP_NAME}" -n "${DEMO_PROJECT}" \
+  -o jsonpath='{.spec.template.spec.containers[0].readinessProbe}' | \
+  python3 -m json.tool
+echo ""
+
+step "Pod readiness status:"
+echo ""
+oc get pods -l "app=${APP_NAME}" -n "${DEMO_PROJECT}"
+echo ""
+
+echo -e "  ${YELLOW}→ Console: Workloads → Deployments → ${APP_NAME} → YAML — scroll to livenessProbe${RESET}"
+echo ""
+pause
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PART 6 — What failure events look like
+# ─────────────────────────────────────────────────────────────────────────────
+header "PART 6 — What probe failures look like in practice"
 
 cat <<'MSG'
   Readiness probe failure (oc describe pod / oc get events):
@@ -144,5 +209,5 @@ echo -e "  ${BOLD}failureThreshold${RESET}     consecutive failures before actio
 echo ""
 echo -e "  ${YELLOW}→ Console: Workloads → Deployments → ${APP_NAME} → YAML${RESET}"
 echo ""
-ok "Probes demo complete — next: Monitoring (09-monitoring.sh)"
+ok "Probes demo complete — next: Resource Requests & Limits (08-resources.sh)"
 echo ""

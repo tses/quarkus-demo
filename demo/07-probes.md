@@ -1,6 +1,6 @@
 # ACT 3 — Liveness & Readiness Probes
 
-> **Script:** `scripts/08-probes.sh`
+> **Script:** `scripts/07-probes.sh`
 > **Overview:** OpenShift uses two probe types with distinct failure actions to manage container health and traffic routing automatically.
 
 ---
@@ -152,4 +152,4 @@ oc describe pod <pod-name> -n ocp-demo
 
 ---
 
-## ⬅️ Previous: [Resource Requests & Limits](07-resources.md) | ➡️ Next: [Monitoring — ServiceMonitor](09-monitoring.md)
+## ⬅️ Previous: [Deploy Postgres Operator](06-operator-postgres.md) | ➡️ Next: [Resource Requests & Limits](08-resources.md)
