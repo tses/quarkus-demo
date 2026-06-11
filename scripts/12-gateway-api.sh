@@ -14,7 +14,11 @@ use_project
 # ── Step 1: Confirm Gateway API CRDs are present ─────────────────────────────
 step "Confirming Gateway API is installed (Connectivity Link / Kuadrant)..."
 show_cmd "oc get crd | grep gateway.networking.k8s.io"
-if ! oc get crd 2>/dev/null | grep -q "gateways.gateway.networking.k8s.io"; then
+# Query the CRD by name directly (no pipe). Using `oc get crd | grep -q ...`
+# is unsafe under `set -o pipefail`: grep -q exits on the first match and
+# closes the pipe, oc then dies with SIGPIPE (exit 141), and pipefail makes
+# the whole pipeline report failure — a false "not installed" result.
+if ! oc get crd gateways.gateway.networking.k8s.io &>/dev/null; then
   warn "Gateway API CRDs not found."
   warn "Install OpenShift Connectivity Link (Kuadrant) before running ACT 4."
   exit 1

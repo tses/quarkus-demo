@@ -54,6 +54,13 @@ oc -n monitoring patch grafanadatasource thanos-query-ds --type merge -p '{
 }'
 ```
 
+## 4. Gateway namespace - dashboard join labels
+For each gateway namespace, label the HTTPRoutes with `service` + `deployment` matching the routed workload, so request panels can join Envoy metrics with Gateway API state metrics.
+```bash
+oc -n ocp-demo label httproute ocp-demo-app ocp-demo-app-mtls \
+  service=ocp-demo-app deployment=ocp-demo-app --overwrite
+```
+
 ## Verify
 ```bash
 # datasource -> expect: ApplySuccessful
@@ -69,5 +76,4 @@ curl -sk -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $SA_TOKEN" \
 ## Notes
 - Dashboards: platform-engineer / app-developer / business-user.
 - business-user (requests/sec per API) needs gateway traffic; `istio_requests_total` stays empty until requests flow through the gateway.
-- Per-app panels (app-developer / business-user) join Istio metrics with Gateway API state metrics **only** when each `HTTPRoute` carries `service` and `deployment` labels matching the backend (e.g. `service=ocp-demo-app`, `deployment=ocp-demo-app`). `scripts/18-connectivity-observability.sh` applies these labels before sending traffic.
 - Do not hardcode `oc whoami -t` in the datasource - it expires and breaks Grafana with 401.
