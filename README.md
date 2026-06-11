@@ -30,25 +30,25 @@ This demo provides a structured introduction to the OpenShift platform for both 
 
 | # | Step | Script | Act | Time |
 |---|---|---|---|---|
-| 1 | [Console Tour](01-console-tour.md) | _(console only)_ | ACT 1 | 10 min |
-| 2 | [Deploy with S2I](02-deploy-s2i.md) | `scripts/02-deploy-s2i.sh` | ACT 2 | 10 min |
-| 3 | [Pods / Service / Route](03-pods-svc-route.md) | `scripts/03-pods-svc-route.sh` | ACT 2 | 10 min |
-| 4 | [Deployment Strategies](04-deployment-strategies.md) | `scripts/04-deployment-strategies.sh` | ACT 3 | 8 min |
-| 5 | [Traffic Splitting](05-traffic-splitting.md) | `scripts/05-traffic-splitting.sh` | ACT 3 | 8 min |
-| 6 | [Deploy Postgres Operator](06-operator-postgres.md) | `scripts/06-operator-postgres.sh` | ACT 3 | 8 min |
-| 7 | [Health Probes](07-probes.md) | `scripts/07-probes.sh` | ACT 3 | 7 min |
-| 8 | [Resource Requests & Limits](08-resources.md) | `scripts/08-resources.sh` | ACT 3 | 7 min |
-| 9 | [Monitoring — ServiceMonitor](09-monitoring.md) | `scripts/09-monitoring.sh` | ACT 3 | 5 min |
-| 10 | [Scaling Out](10-scaling.md) | `scripts/10-scaling.sh` | ACT 3 | 5 min |
-| 11 | [Self-Healing Pods](11-self-healing.md) | `scripts/11-self-healing.sh` | ACT 3 | 4 min |
-| 12 | [Gateway API Introduction](12-gateway-api.md) | `scripts/12-gateway-api.sh` | ACT 4 | 8 min |
-| 13 | [Expose Application with HTTPRoute](13-http-route.md) | `scripts/13-http-route.sh` | ACT 4 | 8 min |
-| 14 | [Secure Traffic with TLSPolicy](14-tls-policy.md) | `scripts/14-tls-policy.sh` | ACT 4 | 7 min |
-| 15 | [Protect API with AuthPolicy](15-auth-policy.md) | `scripts/15-auth-policy.sh` | ACT 4 | 10 min |
-| 16 | [Protect API with RateLimitPolicy](16-rate-limit-policy.md) | `scripts/16-rate-limit-policy.sh` | ACT 4 | 8 min |
-| 17 | [Advanced Authorization with External Metadata](17-external-metadata.md) | `scripts/17-external-metadata.sh` | ACT 4 | 12 min |
-| 18 | [Observe API Connectivity](18-connectivity-observability.md) | `scripts/18-connectivity-observability.sh` | ACT 4 | 6 min |
-| 19 | [Future Extension — Multi-Cluster Connectivity](19-multicluster-future.md) | _(architecture only)_ | ACT 4 | 6 min |
+| 1 | [Console Tour](demo/01-console-tour.md) | _(console only)_ | ACT 1 | 10 min |
+| 2 | [Deploy with S2I](demo/02-deploy-s2i.md) | `scripts/02-deploy-s2i.sh` | ACT 2 | 10 min |
+| 3 | [Pods / Service / Route](demo/03-pods-svc-route.md) | `scripts/03-pods-svc-route.sh` | ACT 2 | 10 min |
+| 4 | [Deployment Strategies](demo/04-deployment-strategies.md) | `scripts/04-deployment-strategies.sh` | ACT 3 | 8 min |
+| 5 | [Traffic Splitting](demo/05-traffic-splitting.md) | `scripts/05-traffic-splitting.sh` | ACT 3 | 8 min |
+| 6 | [Deploy Postgres Operator](demo/06-operator-postgres.md) | `scripts/06-operator-postgres.sh` | ACT 3 | 8 min |
+| 7 | [Health Probes](demo/07-probes.md) | `scripts/07-probes.sh` | ACT 3 | 7 min |
+| 8 | [Resource Requests & Limits](demo/08-resources.md) | `scripts/08-resources.sh` | ACT 3 | 7 min |
+| 9 | [Monitoring — ServiceMonitor](demo/09-monitoring.md) | `scripts/09-monitoring.sh` | ACT 3 | 5 min |
+| 10 | [Scaling Out](demo/10-scaling.md) | `scripts/10-scaling.sh` | ACT 3 | 5 min |
+| 11 | [Self-Healing Pods](demo/11-self-healing.md) | `scripts/11-self-healing.sh` | ACT 3 | 4 min |
+| 12 | [Gateway API Introduction](demo/12-gateway-api.md) | `scripts/12-gateway-api.sh` | ACT 4 | 8 min |
+| 13 | [Expose Application with HTTPRoute](demo/13-http-route.md) | `scripts/13-http-route.sh` | ACT 4 | 8 min |
+| 14 | [Secure Traffic with TLSPolicy](demo/14-tls-policy.md) | `scripts/14-tls-policy.sh` | ACT 4 | 7 min |
+| 15 | [Protect API with AuthPolicy](demo/15-auth-policy.md) | `scripts/15-auth-policy.sh` | ACT 4 | 10 min |
+| 16 | [Protect API with RateLimitPolicy](demo/16-rate-limit-policy.md) | `scripts/16-rate-limit-policy.sh` | ACT 4 | 8 min |
+| 17 | [Advanced Authorization with External Metadata](demo/17-external-metadata.md) | `scripts/17-external-metadata.sh` | ACT 4 | 12 min |
+| 18 | [Observe API Connectivity](demo/18-connectivity-observability.md) | `scripts/18-connectivity-observability.sh` | ACT 4 | 6 min |
+| 19 | Future Extension — Multi-Cluster Connectivity _(planned)_ | _(architecture only)_ | ACT 4 | 6 min |
 
 ---
 
