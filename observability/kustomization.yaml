@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - github.com/Kuadrant/kuadrant-operator/config/install/configure/observability?ref=v1.2.0
+
+patches:
+  # ServiceMonitor istiod: gateway-system -> openshift-ingress
+  - target:
+      kind: ServiceMonitor
+      name: istiod
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: openshift-ingress
+      - op: replace
+        path: /spec/namespaceSelector/matchNames/0
+        value: openshift-ingress
+  # Telemetry namespace-metrics: gateway-system -> openshift-ingress
+  - target:
+      kind: Telemetry
+      name: namespace-metrics
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: openshift-ingress

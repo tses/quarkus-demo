@@ -117,7 +117,7 @@ curl http://<route>/api/info   # returns 200 — application was never unavailab
 
 ---
 
-## ⬅️ Previous: [Scaling Out](10-scaling.md)
+## ⬅️ Previous: [Scaling Out](10-scaling.md) | ➡️ Next: [Gateway API Introduction](12-gateway-api.md)
 
 ---
 
