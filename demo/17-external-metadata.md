@@ -203,20 +203,20 @@ spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
-    name: ocp-demo-app-mtls
+    name: maountain-allowence
   limits:
     "gold":
       rates:
-        - limit: 5
-          window: 10s
+        - limit: 500
+          window: 60s
       when:
         - predicate: 'auth.identity.tier == "gold"'
       counters:
         - expression: 'auth.identity.userid'
     "silver":
       rates:
-        - limit: 2
-          window: 10s
+        - limit: 1500
+          window: 60s
       when:
         - predicate: 'auth.identity.tier == "silver"'
       counters:
