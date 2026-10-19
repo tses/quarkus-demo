@@ -1,0 +1,9 @@
+# PVC template for the `source` workspace: Tekton creates one PVC per
+# PipelineRun (default StorageClass) and removes it when the run finishes
+# (coschedule=pipelineruns, set by step 30).
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

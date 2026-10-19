@@ -1,0 +1,20 @@
+# Application: keep ${DEV_PROJECT} in sync with overlays/dev of the gitops repo.
+# Rendered with envsubst by 36-gitops-setup.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${ARGO_APP}
+  namespace: ${ARGO_NAMESPACE}
+spec:
+  project: ${ARGO_PROJECT}
+  source:
+    repoURL: ${GITOPS_REPO_URL}
+    targetRevision: main
+    path: ${GITOPS_OVERLAY}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${DEV_PROJECT}
+  syncPolicy:
+    automated:
+      prune: true          # delete what was removed from Git
+      selfHeal: true       # revert manual changes in the cluster (drift)

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocp-demo-app
+  labels:
+    app: ocp-demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocp-demo-app
+  template:
+    metadata:
+      labels:
+        app: ocp-demo-app
+    spec:
+      containers:
+        - name: ocp-demo-app
+          image: ocp-demo-app            # set per environment by the overlay (kustomize images)
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 3

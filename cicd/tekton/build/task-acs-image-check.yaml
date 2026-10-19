@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: acs-image-check
+spec:
+  description: >-
+    Red Hat ACS gate for a freshly pushed image. `roxctl image scan` prints the
+    vulnerability report (Critical/Important); `roxctl image check` evaluates the
+    build-time policies and FAILS the task when an enforced policy is violated.
+    Scanning is delegated to the secured cluster (the cloud Central cannot reach
+    the in-cluster registry).
+  params:
+    - name: IMAGE
+      type: string
+      description: Image reference, preferably by digest (repo@sha256:...)
+    - name: SEVERITY
+      type: string
+      default: CRITICAL,IMPORTANT
+    - name: ROXCTL_IMAGE
+      type: string
+      default: registry.redhat.io/advanced-cluster-security/rhacs-roxctl-rhel9:4.11.5
+  stepTemplate:
+    env:
+      # roxctl reads ROX_ENDPOINT / ROX_API_TOKEN natively
+      - name: ROX_ENDPOINT
+        valueFrom: { secretKeyRef: { name: rox-auth, key: endpoint } }
+      - name: ROX_API_TOKEN
+        valueFrom: { secretKeyRef: { name: rox-auth, key: token } }
+      - name: ROX_CLUSTER
+        valueFrom: { secretKeyRef: { name: rox-auth, key: cluster } }
+  steps:
+    - name: image-scan
+      image: $(params.ROXCTL_IMAGE)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "ACS Central : ${ROX_ENDPOINT}   delegated to cluster: ${ROX_CLUSTER}"
+        echo "Image       : $(params.IMAGE)"
+        roxctl image scan --image "$(params.IMAGE)" --cluster "${ROX_CLUSTER}" \
+          --force --retries 6 --retry-delay 10 \
+          --severity "$(params.SEVERITY)" --output table
+    - name: image-check
+      image: $(params.ROXCTL_IMAGE)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "Evaluating ACS build-time policies (enforced ones fail the pipeline)..."
+        roxctl image check --image "$(params.IMAGE)" --cluster "${ROX_CLUSTER}" \
+          --retries 6 --retry-delay 10 --output table

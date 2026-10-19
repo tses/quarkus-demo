@@ -1,0 +1,102 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: gitops-update-image
+spec:
+  description: >-
+    GitOps delivery: commit the new image (by digest) to the environment
+    overlay of the gitops repo, then wait until the Argo CD Application is
+    Synced and Healthy on that commit. The pipeline never touches the
+    target namespace itself — Argo CD does.
+  params:
+    - name: GITOPS_REPO
+      type: string
+      description: Git URL of the gitops repo (in-cluster, http)
+    - name: OVERLAY
+      type: string
+      default: overlays/dev
+    - name: IMAGE_NAME
+      type: string
+      description: Image name used in the Kustomize manifests
+      default: ocp-demo-app
+    - name: IMAGE_REPO
+      type: string
+    - name: IMAGE_DIGEST
+      type: string
+    - name: GIT_COMMIT
+      type: string
+      description: App source commit (traceability annotation)
+    - name: PIPELINE_RUN
+      type: string
+      description: PipelineRun name (traceability annotation)
+      default: ""
+    - name: ARGO_APP
+      type: string
+    - name: ARGO_NAMESPACE
+      type: string
+      default: openshift-gitops
+    - name: GITOPS_IMAGE
+      type: string
+      default: registry.redhat.io/openshift-gitops-1/argocd-rhel9:v1.22.2
+    - name: CLI_IMAGE
+      type: string
+      default: registry.redhat.io/openshift4/ose-cli-rhel9:v4.22
+  results:
+    - name: GITOPS_COMMIT
+      description: Commit in the gitops repo that carries the new image
+  steps:
+    - name: update-manifest
+      image: $(params.GITOPS_IMAGE)
+      env:
+        - { name: HOME, value: /tekton/home }
+        - name: GIT_USER
+          valueFrom: { secretKeyRef: { name: gitops-repo-auth, key: username } }
+        - name: GIT_TOKEN
+          valueFrom: { secretKeyRef: { name: gitops-repo-auth, key: password } }
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        REPO="$(params.GITOPS_REPO)"
+        git config --global user.name "Tekton CI"
+        git config --global user.email "tekton-ci@ked.local"
+        git clone -q "${REPO/:\/\//://${GIT_USER}:${GIT_TOKEN}@}" /tmp/gitops
+        cd /tmp/gitops/$(params.OVERLAY)
+        kustomize edit set image "$(params.IMAGE_NAME)=$(params.IMAGE_REPO)@$(params.IMAGE_DIGEST)"
+        sed -i -e 's|ked-demo/git-commit: .*|ked-demo/git-commit: "$(params.GIT_COMMIT)"|' \
+               -e 's|ked-demo/pipeline-run: .*|ked-demo/pipeline-run: "$(params.PIPELINE_RUN)"|' \
+               deployment-patch.yaml
+        echo "--- $(params.OVERLAY) renders:"
+        kustomize build . | grep -E '^\s+image:|ked-demo/'
+        if git diff --quiet; then
+          echo "Gitops repo already has this image — nothing to commit"
+        else
+          git --no-pager diff --stat
+          git commit -qam "$(params.IMAGE_NAME): deploy $(echo $(params.GIT_COMMIT) | cut -c1-8) ($(params.IMAGE_DIGEST))"
+          for attempt in 1 2 3; do
+            git push -q origin HEAD:main && break
+            echo "push rejected — rebasing on the latest main (attempt ${attempt})"
+            git pull -q --rebase origin main
+          done
+        fi
+        git rev-parse HEAD | tr -d '\n' | tee $(results.GITOPS_COMMIT.path); echo "  ← gitops commit"
+    - name: wait-for-argocd
+      image: $(params.CLI_IMAGE)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        APP=$(params.ARGO_APP); NS=$(params.ARGO_NAMESPACE)
+        WANT="$(cat $(results.GITOPS_COMMIT.path))"
+        # webhook from GitLab normally triggers it; refresh just in case
+        oc annotate application "${APP}" -n "${NS}" argocd.argoproj.io/refresh=normal --overwrite >/dev/null
+        echo "Waiting for Argo CD Application ${APP}: revision ${WANT:0:8}, Synced, Healthy..."
+        for i in $(seq 1 60); do
+          read -r REV SYNC HEALTH < <(oc get application "${APP}" -n "${NS}" \
+            -o jsonpath='{.status.sync.revision} {.status.sync.status} {.status.health.status}{"\n"}')
+          echo "  [$((i*5))s] revision=${REV:0:8} sync=${SYNC} health=${HEALTH}"
+          if [[ "${REV}" == "${WANT}" && "${SYNC}" == "Synced" && "${HEALTH}" == "Healthy" ]]; then
+            echo "Deployed by Argo CD ✔"
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "Timed out waiting for Argo CD"; exit 1

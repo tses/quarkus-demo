@@ -1,0 +1,26 @@
+# The CI pipeline (SA pipeline in ${CICD_PROJECT}) may READ Argo CD Applications
+# and request a refresh (patch annotation) — it waits for Synced/Healthy after
+# committing a new image. It cannot create, delete or sync Applications.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ked-demo-pipeline-app-reader
+  namespace: ${ARGO_NAMESPACE}
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [applications]
+    verbs: [get, list, watch, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ked-demo-pipeline-app-reader
+  namespace: ${ARGO_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ked-demo-pipeline-app-reader
+subjects:
+  - kind: ServiceAccount
+    name: pipeline
+    namespace: ${CICD_PROJECT}

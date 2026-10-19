@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ocp-demo-app
+  labels:
+    app: ocp-demo-app
+spec:
+  to:
+    kind: Service
+    name: ocp-demo-app
+  port:
+    targetPort: 8080-8080
+  tls:
+    termination: edge

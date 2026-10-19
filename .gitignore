@@ -37,3 +37,10 @@ desktop.ini
 *.key
 kubeconfig
 oc-login*.sh
+keys.txt
+
+# ─── Local planning notes ────────────────────────────────────
+30-plan.md
+
+# ─── Reference material (vendor decks — not redistributed) ───
+docs/

@@ -1,0 +1,40 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: maven-cached
+spec:
+  description: >-
+    Maven build with a PERSISTENT local repository. The shipped `maven` Task
+    keeps ~/.m2 in an emptyDir (lost after every run); here the local repo is
+    a separate workspace bound to a PVC, so dependencies are downloaded once.
+  params:
+    - name: GOALS
+      type: array
+      default: ["package"]
+    - name: SUBDIRECTORY
+      type: string
+      default: "."
+    - name: MAVEN_IMAGE
+      type: string
+      default: registry.access.redhat.com/ubi9/openjdk-17:1.24
+  workspaces:
+    - name: source
+      description: Cloned application source (pom.xml)
+    - name: maven-repo
+      description: Maven local repository (persistent cache)
+  steps:
+    - name: mvn
+      image: $(params.MAVEN_IMAGE)
+      workingDir: $(workspaces.source.path)/$(params.SUBDIRECTORY)
+      env:
+        - name: HOME
+          value: /tekton/home
+      args: ["$(params.GOALS[*])"]
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        REPO="$(workspaces.maven-repo.path)"
+        echo "Maven local repo : ${REPO} ($(du -sh "${REPO}" 2>/dev/null | cut -f1) cached)"
+        start=$(date +%s)
+        mvn -B -ntp -Dmaven.repo.local="${REPO}" "$@"
+        echo "Maven finished in $(( $(date +%s) - start ))s — cache now $(du -sh "${REPO}" | cut -f1)"

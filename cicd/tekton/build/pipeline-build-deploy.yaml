@@ -1,0 +1,150 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: build-deploy
+spec:
+  description: >-
+    CI for ocp-demo-app: clone from GitLab → Maven package (cached repo) →
+    buildah build & push to the GitLab registry → ACS scan + policy check →
+    deliver the image (by digest) to the dev project: directly with oc, or
+    GitOps-style (commit to the gitops repo, Argo CD syncs).
+  params:
+    - name: git-url
+      type: string
+    - name: git-revision
+      type: string
+      default: main
+    - name: image-repo
+      type: string
+      description: Registry repository without tag (e.g. registry.<apps>/ked-demo/ocp-demo-app)
+    - name: dev-namespace
+      type: string
+      default: ocp-demo-dev
+    - name: app-name
+      type: string
+      default: ocp-demo-app
+    - name: deploy-mode
+      type: string
+      default: oc
+      description: 'oc = deploy with oc (steps 32–35) · gitops = commit to the gitops repo, Argo CD deploys · none = build + scan only (merge requests)'
+    - name: gitops-repo
+      type: string
+      default: ""
+      description: Gitops repo (in-cluster URL) — used when deploy-mode=gitops
+    - name: gitops-overlay
+      type: string
+      default: overlays/dev
+    - name: argo-app
+      type: string
+      default: ocp-demo-app-dev
+  workspaces:
+    - name: source            # per-run PVC (volumeClaimTemplate)
+    - name: maven-repo        # persistent PVC: Maven cache shared by all runs
+    - name: registry-auth     # Secret (dockerconfigjson) for pushing to GitLab
+  results:
+    - name: IMAGE_URL
+      value: $(tasks.build-image.results.IMAGE_URL)
+    - name: IMAGE_DIGEST
+      value: $(tasks.build-image.results.IMAGE_DIGEST)
+    - name: COMMIT
+      value: $(tasks.fetch-source.results.COMMIT)
+  tasks:
+    - name: fetch-source
+      taskRef:
+        resolver: cluster
+        params:
+          - { name: kind, value: task }
+          - { name: name, value: git-clone }
+          - { name: namespace, value: openshift-pipelines }
+      params:
+        - { name: URL, value: $(params.git-url) }
+        - { name: REVISION, value: $(params.git-revision) }
+        - { name: SSL_VERIFY, value: "false" }      # self-signed Router certificate
+      workspaces:
+        - { name: output, workspace: source }
+
+    - name: build-jar
+      runAfter: [fetch-source]
+      taskRef:
+        name: maven-cached
+      params:
+        - name: GOALS
+          value: ["package", "-DskipTests"]
+      workspaces:
+        - { name: source, workspace: source }
+        - { name: maven-repo, workspace: maven-repo }
+
+    - name: build-image
+      runAfter: [build-jar]
+      taskRef:
+        resolver: cluster
+        params:
+          - { name: kind, value: task }
+          - { name: name, value: buildah }
+          - { name: namespace, value: openshift-pipelines }
+      params:
+        - { name: IMAGE, value: "$(params.image-repo):$(tasks.fetch-source.results.COMMIT)" }
+        - { name: DOCKERFILE, value: ./src/main/docker/Dockerfile }
+        - { name: CONTEXT, value: . }
+        - { name: TLS_VERIFY, value: "false" }      # self-signed Router certificate
+      workspaces:
+        - { name: source, workspace: source }
+        - { name: dockerconfig, workspace: registry-auth }
+
+    - name: acs-image-check
+      taskRef:
+        name: acs-image-check
+      params:
+        - { name: IMAGE, value: "$(params.image-repo)@$(tasks.build-image.results.IMAGE_DIGEST)" }
+
+    - name: deploy-dev
+      runAfter: [acs-image-check]
+      when:
+        - { input: $(params.deploy-mode), operator: in, values: ["oc"] }
+      params:
+        - { name: image, value: "$(params.image-repo)@$(tasks.build-image.results.IMAGE_DIGEST)" }
+        - { name: commit, value: $(tasks.fetch-source.results.COMMIT) }
+      taskSpec:
+        # Inline task: the shipped `openshift-client` Task pulls its image from
+        # the internal registry, which may be disabled (e.g. on SNO)
+        params:
+          - { name: image, type: string }
+          - { name: commit, type: string }
+        steps:
+          - name: oc
+            image: registry.redhat.io/openshift4/ose-cli-rhel9:v4.22
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              NS=$(params.dev-namespace); APP=$(params.app-name); IMG=$(params.image)
+              echo "Deploying ${IMG} → ${NS}"
+              oc create deployment ${APP} --image=${IMG} --port=8080 -n ${NS} \
+                --dry-run=client -o yaml | oc apply -n ${NS} -f -
+              oc set image deployment/${APP} ${APP}=${IMG} -n ${NS}
+              oc set probe deployment/${APP} -n ${NS} --readiness \
+                --get-url=http://:8080/q/health/ready --initial-delay-seconds=3
+              oc annotate deployment/${APP} -n ${NS} --overwrite \
+                ked-demo/git-commit=$(params.commit) \
+                ked-demo/pipeline-run=$(context.pipelineRun.name)
+              oc create service clusterip ${APP} --tcp=8080:8080 -n ${NS} \
+                --dry-run=client -o yaml | oc apply -n ${NS} -f -
+              oc create route edge ${APP} --service=${APP} -n ${NS} \
+                --dry-run=client -o yaml | oc apply -n ${NS} -f -
+              oc rollout status deployment/${APP} -n ${NS} --timeout=180s
+              echo "App URL: https://$(oc get route ${APP} -n ${NS} -o jsonpath='{.spec.host}')/api/info"
+
+    - name: deploy-gitops
+      runAfter: [acs-image-check]
+      when:
+        - { input: $(params.deploy-mode), operator: in, values: ["gitops"] }
+      taskRef:
+        name: gitops-update-image
+      params:
+        - { name: GITOPS_REPO, value: $(params.gitops-repo) }
+        - { name: OVERLAY, value: $(params.gitops-overlay) }
+        - { name: IMAGE_NAME, value: $(params.app-name) }
+        - { name: IMAGE_REPO, value: $(params.image-repo) }
+        - { name: IMAGE_DIGEST, value: $(tasks.build-image.results.IMAGE_DIGEST) }
+        - { name: GIT_COMMIT, value: $(tasks.fetch-source.results.COMMIT) }
+        - { name: PIPELINE_RUN, value: $(context.pipelineRun.name) }
+        - { name: ARGO_APP, value: $(params.argo-app) }

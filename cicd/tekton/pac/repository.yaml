@@ -1,0 +1,19 @@
+# Pipelines-as-Code Repository: links the GitLab project to the CI namespace.
+# Rendered with envsubst by scripts/35-pipelines-as-code.sh.
+apiVersion: pipelinesascode.tekton.dev/v1alpha1
+kind: Repository
+metadata:
+  name: ${APP_NAME}
+  namespace: ${CICD_PROJECT}
+spec:
+  url: ${GITLAB_PROJECT_URL}          # must match the project URL in the webhook payload
+  git_provider:
+    # PAC talks to the GitLab API through the in-cluster Service (plain HTTP):
+    # the Route certificate is self-signed and not trusted by the PAC controller
+    url: ${GITLAB_API_URL}
+    secret:
+      name: ${PAC_SECRET}
+      key: provider.token
+    webhook_secret:
+      name: ${PAC_SECRET}
+      key: webhook.secret

@@ -1,0 +1,10 @@
+# Traceability: which app commit / PipelineRun produced the image.
+# Deployment metadata only (not the Pod template) → updating it does not restart pods.
+# Updated by the CI pipeline (Task gitops-update-image).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocp-demo-app
+  annotations:
+    ked-demo/git-commit: "${GIT_COMMIT}"
+    ked-demo/pipeline-run: "${PIPELINE_RUN}"

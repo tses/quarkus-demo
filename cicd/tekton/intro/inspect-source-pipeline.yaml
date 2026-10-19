@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: inspect-source
+spec:
+  description: Clone the app repo from GitLab and inspect it — Params, Workspaces, Results, cluster resolver.
+  params:
+    - name: git-url
+      type: string
+    - name: git-revision
+      type: string
+      default: main
+  workspaces:
+    - name: source                       # shared volume: task 1 writes, task 2 reads
+  tasks:
+    - name: fetch-source
+      taskRef:                           # ready-made Task shipped with OpenShift Pipelines
+        resolver: cluster
+        params:
+          - { name: kind, value: task }
+          - { name: name, value: git-clone }
+          - { name: namespace, value: openshift-pipelines }
+      params:
+        - { name: URL, value: $(params.git-url) }
+        - { name: REVISION, value: $(params.git-revision) }
+        - { name: SSL_VERIFY, value: "false" }   # Router certificate is self-signed
+      workspaces:
+        - { name: output, workspace: source }
+
+    - name: inspect-source               # runs after fetch-source: it consumes its result
+      params:
+        - { name: commit, value: $(tasks.fetch-source.results.COMMIT) }
+      workspaces:
+        - { name: source, workspace: source }
+      taskSpec:                          # inline Task
+        params:
+          - { name: commit, type: string }
+        workspaces:
+          - { name: source }
+        steps:
+          - name: inspect
+            image: registry.access.redhat.com/ubi9/ubi-minimal
+            workingDir: $(workspaces.source.path)
+            script: |
+              #!/usr/bin/env bash
+              echo "Commit cloned by fetch-source : $(params.commit)"
+              echo "Workspace content             :"
+              ls -1
+              echo "Maven project                 : $(grep -m1 '<artifactId>' pom.xml | sed 's/ *<[^>]*>//g')"

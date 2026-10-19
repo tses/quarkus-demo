@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: hello
+spec:
+  description: Smallest useful Task — one param, one result, two steps (= two containers in one Pod).
+  params:
+    - name: name
+      type: string
+      default: OpenShift
+  results:
+    - name: greeting
+      description: Message produced by step 1, read back by step 2
+  steps:
+    - name: say-hello
+      image: registry.access.redhat.com/ubi9/ubi-minimal
+      script: |
+        #!/usr/bin/env bash
+        echo "Step 1 | pod ${HOSTNAME} | Hello $(params.name)!"
+        echo -n "Hello $(params.name) from Tekton" > $(results.greeting.path)
+    - name: read-result
+      image: registry.access.redhat.com/ubi9/ubi-minimal
+      script: |
+        #!/usr/bin/env bash
+        echo "Step 2 | pod ${HOSTNAME} | same Pod, different container"
+        echo "Step 2 | result written by step 1: '$(cat $(results.greeting.path))'"

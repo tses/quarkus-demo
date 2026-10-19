@@ -1,0 +1,34 @@
+# AppProject: what the KED demo Applications may deploy, from where, to where
+# (deck: do not use the "default" project). Rendered with envsubst by 36-gitops-setup.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ${ARGO_PROJECT}
+  namespace: ${ARGO_NAMESPACE}
+spec:
+  description: KED OpenShift training — ocp-demo-app (ACT 5)
+  sourceRepos:
+    - ${GITOPS_REPO_URL}
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: ${DEV_PROJECT}
+  clusterResourceWhitelist: []            # no cluster-scoped objects
+  namespaceResourceWhitelist:
+    - { group: apps, kind: Deployment }
+    - { group: "", kind: Service }
+    - { group: route.openshift.io, kind: Route }
+---
+# Repository: the gitops repo is public (read without credentials); the
+# Route certificate is self-signed → skip TLS verification for this repo only.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${GITOPS_PROJECT}-repo
+  namespace: ${ARGO_NAMESPACE}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: ${GITOPS_REPO_URL}
+  project: ${ARGO_PROJECT}
+  insecure: "true"

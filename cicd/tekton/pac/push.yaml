@@ -1,0 +1,37 @@
+# .tekton/push.yaml — committed to the APP repo by scripts/35-pipelines-as-code.sh
+# (cluster values rendered with envsubst; {{ ... }} are Pipelines-as-Code variables).
+# Every push to main → build, scan, deploy to the dev project (oc, or via Argo CD once
+# deploy-mode is gitops — step 37).
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: ${APP_NAME}-push-
+  annotations:
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[main]"
+    pipelinesascode.tekton.dev/max-keep-runs: "10"
+spec:
+  pipelineRef:                     # Pipeline owned by the platform team, in ${CICD_PROJECT}
+    resolver: cluster              # (PAC only inlines Pipelines found in .tekton/)
+    params:
+      - { name: kind, value: pipeline }
+      - { name: name, value: ${PIPELINE_NAME} }
+      - { name: namespace, value: ${CICD_PROJECT} }
+  params:
+    - { name: git-url, value: "{{ repo_url }}" }
+    - { name: git-revision, value: "{{ revision }}" }
+    - { name: image-repo, value: ${IMAGE_REPO} }
+    - { name: dev-namespace, value: ${DEV_PROJECT} }
+    - { name: app-name, value: ${APP_NAME} }
+    - { name: deploy-mode, value: ${DEPLOY_MODE} }       # oc → gitops in step 37
+    - { name: gitops-repo, value: ${GITOPS_REPO_INTERNAL} }
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources: { requests: { storage: 1Gi } }
+    - name: maven-repo
+      persistentVolumeClaim: { claimName: ${MAVEN_CACHE_PVC} }
+    - name: registry-auth
+      secret: { secretName: ${REGISTRY_SECRET} }

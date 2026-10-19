@@ -1,0 +1,254 @@
+# =============================================================================
+# GitLab Omnibus (gitlab-ce) — in-cluster Git server + Container Registry
+# LAB/DEMO ONLY: single replica, no HA, no backups.
+#
+# Template rendered by scripts/30-gitlab-setup.sh with envsubst:
+#   ${GITLAB_NAMESPACE} ${GITLAB_IMAGE} ${GITLAB_HOST} ${GITLAB_REGISTRY_HOST}
+#   ${GITLAB_CREDS_SECRET} ${GITLAB_STORAGE_CLASS}
+#
+# One container bundles Redis, Puma, Sidekiq, Gitaly, nginx and the Container
+# Registry. The bundled PostgreSQL is DISABLED: GitLab uses the separate
+# PostgreSQL 17 from gitlab-postgresql.yaml (deployed first) for both the Rails
+# DB and the registry metadata DB. TLS is terminated at the OpenShift Router
+# (edge Routes); inside the pod nginx listens on plain HTTP (80 = web/API/git,
+# 5050 = registry).
+# =============================================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab
+  namespace: ${GITLAB_NAMESPACE}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-config
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+spec:
+  storageClassName: ${GITLAB_STORAGE_CLASS}
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-logs
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+spec:
+  storageClassName: ${GITLAB_STORAGE_CLASS}
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+# Repositories, PostgreSQL data, uploads and registry blobs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitlab-data
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+spec:
+  storageClassName: ${GITLAB_STORAGE_CLASS}
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+    app.kubernetes.io/part-of: gitlab
+spec:
+  replicas: 1
+  progressDeadlineSeconds: 1200   # first boot (reconfigure + migrations) is slow
+  strategy:
+    type: Recreate            # RWO volumes — never run two pods at once
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      serviceAccountName: gitlab   # bound to the anyuid SCC (Omnibus runs as root)
+      containers:
+        - name: gitlab
+          image: ${GITLAB_IMAGE}
+          ports:
+            - name: http
+              containerPort: 80
+            - name: registry
+              containerPort: 5050
+          env:
+            - name: GITLAB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${GITLAB_CREDS_SECRET}
+                  key: root-password
+            - name: GITLAB_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${GITLAB_CREDS_SECRET}
+                  key: db-password
+            - name: REGISTRY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${GITLAB_CREDS_SECRET}
+                  key: registry-db-password
+            - name: GITLAB_OMNIBUS_CONFIG
+              value: |
+                external_url 'https://${GITLAB_HOST}'
+                nginx['listen_port'] = 80
+                nginx['listen_https'] = false
+                nginx['proxy_set_headers'] = { "X-Forwarded-Proto" => "https", "X-Forwarded-Ssl" => "on" }
+
+                registry_external_url 'https://${GITLAB_REGISTRY_HOST}'
+                registry_nginx['listen_port'] = 5050
+                registry_nginx['listen_https'] = false
+                registry_nginx['proxy_set_headers'] = { "X-Forwarded-Proto" => "https", "X-Forwarded-Ssl" => "on" }
+
+                # External PostgreSQL 17 (gitlab-postgresql.yaml)
+                postgresql['enable'] = false
+                gitlab_rails['db_adapter'] = 'postgresql'
+                gitlab_rails['db_encoding'] = 'unicode'
+                gitlab_rails['db_host'] = 'gitlab-postgresql.${GITLAB_NAMESPACE}.svc'
+                gitlab_rails['db_port'] = 5432
+                gitlab_rails['db_database'] = 'gitlabhq_production'
+                gitlab_rails['db_username'] = 'gitlab'
+                gitlab_rails['db_password'] = ENV['GITLAB_DB_PASSWORD']
+                gitlab_rails['db_sslmode'] = 'disable'
+                registry['database'] = {
+                  'enabled' => true,
+                  'host' => 'gitlab-postgresql.${GITLAB_NAMESPACE}.svc',
+                  'port' => 5432,
+                  'user' => 'registry',
+                  'password' => ENV['REGISTRY_DB_PASSWORD'],
+                  'dbname' => 'registry',
+                  'sslmode' => 'disable'
+                }
+
+                letsencrypt['enable'] = false
+                gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0', '::/0']
+                gitlab_rails['usage_ping_enabled'] = false
+
+                # Small footprint for a single-node demo cluster
+                puma['worker_processes'] = 0
+                sidekiq['concurrency'] = 10
+                prometheus_monitoring['enable'] = false
+                gitlab_kas['enable'] = false
+          resources:
+            requests:
+              cpu: 500m
+              memory: 3Gi
+            limits:
+              memory: 6Gi
+          startupProbe:
+            httpGet:
+              path: /-/readiness
+              port: 80
+            periodSeconds: 10
+            failureThreshold: 90      # first boot (reconfigure + migrations) ≈ 5–10 min
+          readinessProbe:
+            httpGet:
+              path: /-/readiness
+              port: 80
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/liveness
+              port: 80
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/gitlab
+            - name: logs
+              mountPath: /var/log/gitlab
+            - name: data
+              mountPath: /var/opt/gitlab
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: gitlab-config
+        - name: logs
+          persistentVolumeClaim:
+            claimName: gitlab-logs
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitlab-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+spec:
+  selector:
+    app: gitlab
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: registry
+      port: 5050
+      targetPort: 5050
+---
+# Web UI, REST API and Git-over-HTTPS
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gitlab
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+  annotations:
+    haproxy.router.openshift.io/timeout: 300s
+spec:
+  host: ${GITLAB_HOST}
+  to:
+    kind: Service
+    name: gitlab
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+# Container Registry (buildah push / image pull / ACS scan)
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gitlab-registry
+  namespace: ${GITLAB_NAMESPACE}
+  labels:
+    app: gitlab
+  annotations:
+    haproxy.router.openshift.io/timeout: 300s
+spec:
+  host: ${GITLAB_REGISTRY_HOST}
+  to:
+    kind: Service
+    name: gitlab
+  port:
+    targetPort: registry
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
