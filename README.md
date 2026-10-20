@@ -81,6 +81,15 @@ Verify the following before starting:
 - [ ] `tkn` CLI on the demo machine (Console → **?** → Command Line Tools) — required for ACT 5
 - [ ] Red Hat ACS: cluster is a SecuredCluster of an ACS Central; Central URL and API token in `keys.txt` (repo root, git-ignored) as `acs_url:https://<central>` and `acs:<token>`
 
+> **Dry run without ENTER:** the scripts stop at every `pause` / `show_cmd` for live pacing. For a rehearsal or a quick re-run, set `DEMO_AUTO=1` (optionally `DEMO_AUTO_DELAY=<seconds>` to keep a short pause at each stop):
+>
+> ```bash
+> DEMO_AUTO=1 ./scripts/32-pipeline-build-deploy.sh
+> DEMO_AUTO=1 DEMO_AUTO_DELAY=2 ./scripts/34-acs-image-check.sh
+> ```
+>
+> Optional `y/N` questions take their default (`N`). The teardown `yes/no` confirmations are still asked (`echo yes | ./scripts/39-teardown.sh` to skip them).
+
 
 ---
 

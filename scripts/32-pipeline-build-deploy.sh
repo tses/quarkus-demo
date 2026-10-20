@@ -329,7 +329,7 @@ header "PART 6 — Second run: Maven cache"
 FIRST_MVN="$(maven_time "${PR}")"
 echo -e "  Maven took ${BOLD}${FIRST_MVN}${RESET} in run '${PR}' (Maven cache PVC: $(oc get pvc "${MAVEN_CACHE_PVC}" -n "${CICD_PROJECT}" -o jsonpath='{.status.capacity.storage}'))."
 echo -n "  Start a second run to show the cached Maven repository? (y/N): "
-read -r AGAIN
+if demo_auto; then AGAIN="n"; echo "n [auto]"; else read -r AGAIN < /dev/tty; fi
 if [[ "${AGAIN}" =~ ^[Yy] ]]; then
   show_cmd "tkn pipeline start ${PIPELINE_NAME} ... (same parameters and workspaces)" \
     "Start a second PipelineRun" \

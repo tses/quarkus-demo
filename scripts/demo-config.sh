@@ -263,11 +263,28 @@ warn() {
   echo -e "${RED}⚠ $1${RESET}"
 }
 
+# Unattended mode: DEMO_AUTO=1 ./scripts/NN-....sh runs without waiting for
+# ENTER (pause/show_cmd); DEMO_AUTO_DELAY=<sec> still pauses briefly at each
+# stop so the output can be followed. Destructive yes/no prompts are kept.
+DEMO_AUTO="${DEMO_AUTO:-0}"
+DEMO_AUTO_DELAY="${DEMO_AUTO_DELAY:-0}"
+demo_auto() { [[ "${DEMO_AUTO}" == "1" ]]; }
+
+# Wait for ENTER, or DEMO_AUTO_DELAY seconds in unattended mode
+_wait_enter() {
+  if demo_auto; then
+    echo -e "${BOLD}[auto]${RESET}"
+    sleep "${DEMO_AUTO_DELAY}"
+  else
+    read -r < /dev/tty
+  fi
+}
+
 # Wait for user to press Enter (pacing during live demo)
 pause() {
   echo ""
   echo -e "${BOLD}[Press ENTER to continue...]${RESET}"
-  read -r
+  _wait_enter
 }
 
 # Wait for a deployment to be ready
@@ -319,7 +336,7 @@ show_cmd() {
   printf "%s%s%s\n" "${_B}${_Y}" "$(_box_rule └ "" ┘)" "${_R}"
   printf "\n"
   printf "%s[Press ENTER to run ↑]%s " "${_B}" "${_R}"
-  read -r < /dev/tty
+  _wait_enter
 }
 
 # Check oc is logged in
