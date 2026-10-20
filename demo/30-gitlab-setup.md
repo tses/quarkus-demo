@@ -62,7 +62,8 @@ flowchart LR
 | 9 | Creates project access token **`tekton-ci`** (Maintainer · `api`, repo + registry read/write) | reused while valid |
 | 10 | **OpenShift Pipelines prep:** TektonConfig `spec.pipeline.coschedule` → `pipelineruns` (original value kept in annotation `ked-demo/original-coschedule`); waits until the controller's `feature-flags` report it | only if different |
 | 11 | **Registry trust for the nodes:** Router CA → ConfigMap `openshift-config/ked-demo-registry-ca` (key = registry host) → `image.config` `additionalTrustedCA`; waits for `openshift-apiserver` to roll out (≈1–2 min API blip on SNO) | only if different |
-| 12 | Verifies: tables in both databases, bundled PostgreSQL not running, registry `/v2/` → HTTP 401 | — |
+| 12 | **ACS Scanner V4 pre-flight:** restarts `scanner-v4-indexer` if the `scanner-v4-db` Pod is younger (lost schema, e.g. after a node reboot) — same guard 32/34 run before each pipeline | no-op when healthy or ACS not installed |
+| 13 | Verifies: tables in both databases, bundled PostgreSQL not running, registry `/v2/` → HTTP 401 | — |
 
 All credentials are generated at runtime and stored **only** in the cluster Secret `gitlab-demo-credentials` (`root-password`, `db-password`, `registry-db-password`, `root-token`, `ci-username`, `ci-token`). Nothing secret is written to the repo.
 
@@ -139,6 +140,7 @@ oc get cm feature-flags -n openshift-pipelines -o jsonpath='{.data.coschedule}{"
 | Rollout `exceeded its progress deadline` | First boot is longer than usual — re-run the script (it continues where it stopped). |
 | App pod `ImagePullBackOff … x509: certificate signed by unknown authority` (step 32) | Nodes do not trust the Router CA for the registry — re-run the script (step 11). Propagation to the nodes takes ~1 min, no reboot. |
 | TaskRun `more than one PersistentVolumeClaim is bound` | TektonConfig coschedule is back to `workspaces` (e.g. operator reset) — re-run the script. |
+| `image-scan`: `Database operation failed` / `relation "manifest_metadata" does not exist` (step 32+) | The Scanner V4 indexer builds its schema only at startup; a `scanner-v4-db` Pod started **after** it leaves an empty database. Step 12 detects and fixes this — re-run the script, or by hand: `oc rollout restart deploy/scanner-v4-indexer -n rhacs-operator`. |
 
 ---
 

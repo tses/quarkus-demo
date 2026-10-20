@@ -27,7 +27,7 @@ sequenceDiagram
 |---|---|---|
 | `Repository` CR `ocp-demo-app` | `ocp-demo-cicd` | platform — links the GitLab project to the CI namespace |
 | Secret `gitlab-pac` | `ocp-demo-cicd` | platform — GitLab API token (`tekton-ci` project token) + webhook secret |
-| Project webhook | GitLab → *Settings → Webhooks* | platform — push, merge request, comment events |
+| Project webhook | GitLab → *Settings → Webhooks* | platform — push, merge request, comment events; created via the API (same as *Settings → Webhooks → Add new webhook*) |
 | `.tekton/push.yaml`, `.tekton/pull-request.yaml` | **app repo** | app team — *when* to run and *with which parameters* |
 | Pipeline `build-deploy` | `ocp-demo-cicd` (cluster resolver) | platform — *how* to build, scan, deploy |
 

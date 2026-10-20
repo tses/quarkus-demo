@@ -4,6 +4,11 @@
 # Source this file at the top of every script: source "$(dirname "$0")/demo-config.sh"
 # =============================================================================
 
+# Absolute repo root, resolved once while sourcing — scripts may `cd` afterwards,
+# which would break a relative "${BASH_SOURCE[0]}" lookup done later at call time.
+DEMO_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export DEMO_REPO_ROOT
+
 # -----------------------------------------------------------------------------
 # CLUSTER SETTINGS — auto-detected from active oc login session
 # Run: oc login <cluster-url> before starting the demo. No need to edit these.
@@ -285,16 +290,33 @@ wait_for_pods() {
   ok "Pods are ready"
 }
 
+# Box rule of fixed width:  _box_rule <left-corner> <label> <right-corner>
+_box_rule() {
+  local label="${2:+─ $2 }" fill=62
+  local n=$(( fill - ${#label} )) dashes=""
+  (( n < 3 )) && n=3
+  printf -v dashes '%*s' "${n}" ''
+  printf '%s%s%s%s' "$1" "${label}" "${dashes// /─}" "$3"
+}
+
 # Show a command (or YAML block) before executing — gives presenter time to explain
-# Usage:  show_cmd "oc new-app ..."
+# Usage:  show_cmd "oc new-app ..." ["Action (verb + object)"] ["How to do it in the UI"]
+#   show_cmd "POST .../projects" "Create GitLab project" "GitLab → Group → New project → Create blank project"
 show_cmd() {
-  local _B=$'\033[1m' _Y=$'\033[1;33m' _C=$'\033[0;36m' _R=$'\033[0m'
+  local _B=$'\033[1m' _Y=$'\033[1;33m' _C=$'\033[0;36m' _M=$'\033[0;35m' _R=$'\033[0m'
+  local action="${2:-Command}" ui="${3:-}"
   printf "\n"
-  printf "%s┌─ Command ────────────────────────────────────────────────────┐%s\n" "${_B}${_Y}" "${_R}"
+  printf "%s%s%s\n" "${_B}${_Y}" "$(_box_rule ┌ "${action}" ┐)" "${_R}"
   while IFS= read -r line; do
     printf "%s│%s  %s%s%s\n" "${_B}${_Y}" "${_R}" "${_C}" "${line}" "${_R}"
   done <<< "$1"
-  printf "%s└──────────────────────────────────────────────────────────────┘%s\n" "${_B}${_Y}" "${_R}"
+  if [[ -n "${ui}" ]]; then
+    printf "%s%s%s\n" "${_B}${_Y}" "$(_box_rule ├ "UI" ┤)" "${_R}"
+    while IFS= read -r line; do
+      printf "%s│%s  %s%s%s\n" "${_B}${_Y}" "${_R}" "${_M}" "${line}" "${_R}"
+    done <<< "${ui}"
+  fi
+  printf "%s%s%s\n" "${_B}${_Y}" "$(_box_rule └ "" ┘)" "${_R}"
   printf "\n"
   printf "%s[Press ENTER to run ↑]%s " "${_B}" "${_R}"
   read -r < /dev/tty
@@ -380,7 +402,7 @@ get_gitlab_cred() {
 # ACT 5 — read "name:value" from the git-ignored KEYS_FILE (empty if missing)
 get_key() {
   local file="${KEYS_FILE}"
-  [[ "${file}" = /* ]] || file="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/${file}"
+  [[ "${file}" = /* ]] || file="${DEMO_REPO_ROOT}/${file}"
   [[ -f "${file}" ]] || return 0
   sed -n "s/^$1:[[:space:]]*//p" "${file}" | head -1 | tr -d '\r\n '
 }
@@ -416,17 +438,50 @@ argo_enabled() {
 # ACT 5 — how the pipeline delivers: "oc" (steps 32–35) or "gitops" (step 37+)
 get_deploy_mode() { if argo_enabled; then echo gitops; else echo oc; fi; }
 
+# ACT 5 — Scanner V4 schema guard (steps 30, 32, 34).
+# The Scanner V4 indexer creates its database schema only at startup. If the
+# scanner-v4-db Pod is replaced afterwards — e.g. its PVC is re-provisioned
+# after a node reboot — the database comes up empty and nothing recreates the
+# tables, so every scan fails with
+#   code = Internal desc = Database operation failed
+#   relation "manifest_metadata" does not exist (SQLSTATE 42P01)
+# until the indexer is restarted. A DB Pod younger than the indexer Pod is the
+# signature; restarting the indexer is a no-op when the schema is already there.
+ensure_acs_scanner_ready() {
+  local ns db_start idx_start
+  ns="$(oc get deploy -A -l app=scanner-v4-indexer \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)"
+  [[ -z "${ns}" ]] && return 0        # Scanner V4 not deployed — nothing to guard
+
+  db_start="$(oc get pod -n "${ns}" -l app=scanner-v4-db \
+    -o jsonpath='{.items[0].status.startTime}' 2>/dev/null)"
+  idx_start="$(oc get pod -n "${ns}" -l app=scanner-v4-indexer \
+    -o jsonpath='{.items[0].status.startTime}' 2>/dev/null)"
+  [[ -z "${db_start}" || -z "${idx_start}" ]] && return 0
+
+  # RFC3339 in UTC → lexicographic comparison is chronological
+  if [[ "${db_start}" < "${idx_start}" ]]; then
+    ok "Scanner V4 schema OK (indexer started after the DB)"
+    return 0
+  fi
+
+  warn "Scanner V4 DB (${db_start}) started after the indexer (${idx_start}) — the schema may be gone"
+  step "Restarting scanner-v4-indexer so it recreates the schema (otherwise the ACS scan fails)"
+  oc rollout restart deploy/scanner-v4-indexer -n "${ns}"
+  oc rollout status deploy/scanner-v4-indexer -n "${ns}" --timeout=180s
+  ok "Scanner V4 indexer restarted"
+}
+
 # ACT 5 — start the build-deploy pipeline and stream its logs (steps 32, 34).
 # Never fails: callers check the outcome with last_build_run / oc get.
 start_build_run() {
-  local repo_root
-  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  ensure_acs_scanner_ready
   tkn pipeline start "${PIPELINE_NAME}" -n "${CICD_PROJECT}" \
     -p git-url="https://$(get_gitlab_host)/${GITLAB_GROUP}/${GITLAB_PROJECT}.git" \
     -p image-repo="$(get_app_image_repo)" \
     -p dev-namespace="${DEV_PROJECT}" -p app-name="${APP_NAME}" \
     -p deploy-mode="$(get_deploy_mode)" -p gitops-repo="$(get_gitops_repo_internal)" \
-    -w name=source,volumeClaimTemplateFile="${repo_root}/cicd/tekton/intro/workspace-template.yaml" \
+    -w name=source,volumeClaimTemplateFile="${DEMO_REPO_ROOT}/cicd/tekton/intro/workspace-template.yaml" \
     -w name=maven-repo,claimName="${MAVEN_CACHE_PVC}" \
     -w name=registry-auth,secret="${REGISTRY_SECRET}" \
     --use-param-defaults --showlog || true

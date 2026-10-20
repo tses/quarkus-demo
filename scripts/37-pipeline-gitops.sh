@@ -80,7 +80,9 @@ header "PART 2 — Task 'gitops-update-image'"
 
 step "Update the manifest, push, wait for Argo CD"
 show_cmd "# ${BUILD_DIR}/task-gitops-update-image.yaml
-$(cat "${BUILD_DIR}/task-gitops-update-image.yaml")"
+$(cat "${BUILD_DIR}/task-gitops-update-image.yaml")" \
+  "Create Task 'gitops-update-image'" \
+  "Console → Pipelines → Tasks → Create → Task (paste the YAML)"
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/task-gitops-update-image.yaml"
 echo ""
 pause
@@ -88,7 +90,9 @@ pause
 step "Pipeline: deploy-dev (oc) or deploy-gitops — chosen by the 'deploy-mode' parameter"
 show_cmd "$(sed -n '/- name: deploy-mode/,/argo-app/p' "${BUILD_DIR}/pipeline-build-deploy.yaml")
 ...
-$(sed -n '/- name: deploy-gitops/,$p' "${BUILD_DIR}/pipeline-build-deploy.yaml")"
+$(sed -n '/- name: deploy-gitops/,$p' "${BUILD_DIR}/pipeline-build-deploy.yaml")" \
+  "Update Pipeline '${PIPELINE_NAME}'" \
+  "Console → Pipelines → ${PIPELINE_NAME} → Actions → Edit Pipeline (builder or YAML view)"
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/pipeline-build-deploy.yaml"
 echo ""
 pause
@@ -104,7 +108,9 @@ NEW_PUSH="$(render_pac "${PAC_DIR}/push.yaml")"
 CUR_PUSH="$(gl_api GET "/projects/${PROJECT_ENC}/repository/files/.tekton%2Fpush.yaml/raw?ref=main")"
 
 step ".tekton/push.yaml in the app repo: deploy-mode oc → gitops"
-show_cmd "$(diff <(echo "${CUR_PUSH}") <(echo "${NEW_PUSH}") || true)"
+show_cmd "$(diff <(echo "${CUR_PUSH}") <(echo "${NEW_PUSH}") || true)" \
+  "Commit a change to .tekton/push.yaml (main)" \
+  "GitLab → ${PROJECT_PATH} → Code → Repository → .tekton/push.yaml → Edit → Commit changes"
 if pac_enabled && [[ "${CUR_PUSH}" != "${NEW_PUSH}" ]]; then
   ACTION=update; [[ "${CUR_PUSH}" == *'"message":"404'* ]] && ACTION=create
   RESP="$(gl_api POST "/projects/${PROJECT_ENC}/repository/commits" --data "$(jq -nc --arg a "${ACTION}" --arg c "${NEW_PUSH}" \
@@ -118,7 +124,9 @@ if pac_enabled && [[ "${CUR_PUSH}" != "${NEW_PUSH}" ]]; then
   RUN="${PAC_RUN}"
 else
   ok ".tekton/push.yaml already uses deploy-mode=gitops (or Pipelines-as-Code not connected) — starting a run with tkn"
-  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... -p deploy-mode=gitops --showlog"
+  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... -p deploy-mode=gitops --showlog" \
+    "Start a PipelineRun (deploy-mode=gitops)" \
+    "Console → Pipelines → ${PIPELINE_NAME} → Actions → Start (deploy-mode = gitops)"
   start_build_run
   RUN="$(last_build_run)"
 fi
@@ -136,7 +144,10 @@ header "PART 4 — Follow the image: pipeline → Git → Argo CD → cluster"
 
 GITOPS_AFTER="$(gl_api GET "/projects/${GITOPS_ENC}/repository/commits/main" | jq -r '.id')"
 step "New commit in the gitops repo (by the pipeline)"
-show_cmd "GET ${GL_API}/projects/${GITOPS_ENC}/repository/commits/${GITOPS_AFTER:0:8}/diff"
+show_cmd "GET ${GL_API}/projects/${GITOPS_ENC}/repository/commits/${GITOPS_AFTER:0:8}/diff" \
+  "Read the gitops commit (diff)" \
+  "GitLab → ${GITOPS_PATH} → Code → Commits → ${GITOPS_AFTER:0:8} → Changes
+${GITLAB_URL}/${GITOPS_PATH}/-/commit/${GITOPS_AFTER}"
 gl_api GET "/projects/${GITOPS_ENC}/repository/commits/${GITOPS_AFTER}" | jq -r '"  \(.short_id)  \(.author_name)  \(.title)"'
 gl_api GET "/projects/${GITOPS_ENC}/repository/commits/${GITOPS_AFTER}/diff" \
   | jq -r '.[] | "  --- " + .new_path, (.diff | split("\n")[] | select(test("^[-+][^-+]")) | "    " + .)'
@@ -146,7 +157,10 @@ echo ""
 
 step "Argo CD Application and the running image"
 show_cmd "oc get application ${ARGO_APP} -n ${ARGO_NAMESPACE}
-oc get deployment ${APP_NAME} -n ${DEV_PROJECT} -o jsonpath='{.spec.template.spec.containers[0].image}'"
+oc get deployment ${APP_NAME} -n ${DEV_PROJECT} -o jsonpath='{.spec.template.spec.containers[0].image}'" \
+  "Inspect the Application + running image" \
+  "Argo CD → Applications → ${ARGO_APP} → App details / History and rollback
+Console → Workloads → Deployments → ${APP_NAME} → YAML (image)"
 oc get application "${ARGO_APP}" -n "${ARGO_NAMESPACE}" \
   -o custom-columns='NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REVISION:.status.sync.revision'
 echo -e "  Before : ${CYAN}${IMAGE_BEFORE}${RESET}"
@@ -161,7 +175,9 @@ pause
 header "PART 5 — The pipeline no longer needs the keys to dev"
 
 step "Remove the pipeline's edit role in '${DEV_PROJECT}' (granted in step 32 for oc deploys)"
-show_cmd "oc policy remove-role-from-user edit system:serviceaccount:${CICD_PROJECT}:pipeline -n ${DEV_PROJECT}"
+show_cmd "oc policy remove-role-from-user edit system:serviceaccount:${CICD_PROJECT}:pipeline -n ${DEV_PROJECT}" \
+  "Remove the pipeline SA's edit role" \
+  "Console → User Management → RoleBindings (project ${DEV_PROJECT}) → edit binding of 'pipeline' → Delete"
 oc policy remove-role-from-user edit "system:serviceaccount:${CICD_PROJECT}:pipeline" -n "${DEV_PROJECT}" &>/dev/null || true
 echo -e "  can-i update deployments in ${DEV_PROJECT}: ${BOLD}$(oc auth can-i update deployments -n "${DEV_PROJECT}" --as="system:serviceaccount:${CICD_PROJECT}:pipeline" || true)${RESET}"
 echo -e "  can-i get applications in ${ARGO_NAMESPACE}: ${BOLD}$(oc auth can-i get applications.argoproj.io -n "${ARGO_NAMESPACE}" --as="system:serviceaccount:${CICD_PROJECT}:pipeline" || true)${RESET}"

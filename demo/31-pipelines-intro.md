@@ -62,7 +62,7 @@ flowchart LR
 | 4 | Applies Pipeline **`inspect-source`** (`git-clone` via cluster resolver → inline task) and runs it against the GitLab app repo | `oc apply`, `tkn pipeline start -w volumeClaimTemplateFile=… --showlog` |
 | 5 | Console links: Pipelines view, the PipelineRun, Tasks, GitLab repo | — |
 
-Every command is shown in a box before it runs (`show_cmd`). Re-running is safe: `oc apply` for the definitions, a new run each time.
+Every command is shown in a box before it runs (`show_cmd`), titled with the action and followed by the equivalent UI path. Re-running is safe: `oc apply` for the definitions, a new run each time.
 
 ---
 

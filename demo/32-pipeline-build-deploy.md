@@ -31,7 +31,7 @@ flowchart LR
 | `build-jar` | **`maven-cached`** (ours) | `mvn package -DskipTests` with `-Dmaven.repo.local` on the `maven-repo` PVC |
 | `build-image` | `buildah` (cluster resolver) | Builds `src/main/docker/Dockerfile`, pushes `<registry>/ked-demo/ocp-demo-app:<commit>`; result `IMAGE_DIGEST` |
 | `acs-image-check` | **`acs-image-check`** (ours) | `roxctl image scan` (report, Critical/Important) + `roxctl image check` (**fails** on enforced build policies) |
-| `deploy-dev` | inline `taskSpec` (`ose-cli-rhel9`) | Deployment/Service/Route in `ocp-demo-dev`, image **by digest**, annotated with the Git commit. Runs only when param `deploy-mode` = `oc` (default). `none` = merge-request runs (step 35); `gitops` = task `deploy-gitops` instead (step 37) |
+| `deploy-dev` | inline `taskSpec` (`ose-cli-rhel9`) | Deployment/Service/Route in `ocp-demo-dev`, image **by digest**, annotated with the Git commit, env `APP_COLOUR=blue` (same as the gitops base in step 36). Runs only when param `deploy-mode` = `oc` (default). `none` = merge-request runs (step 35); `gitops` = task `deploy-gitops` instead (step 37) |
 
 > **Key point:** The image is referenced by **digest** from the build onwards — what ACS scanned is exactly what runs. A tag could be moved; a digest cannot.
 
@@ -46,6 +46,7 @@ flowchart LR
 | 2 | Secret `gitlab-registry` (GitLab CI token): push from cicd, pull in dev (linked to SA `default`) | `--dry-run \| oc apply` |
 | 2 | Secret `rox-auth` (`endpoint`, `token`, `cluster`) from `keys.txt` | `--dry-run \| oc apply` |
 | 2 | ACS API: image integration **`ked-demo-gitlab`** (registry credentials, `insecure`) + **delegated scanning** for the registry → this cluster | upsert / only if missing |
+| 2 | **Scanner V4 pre-flight:** restarts `scanner-v4-indexer` if the DB Pod is younger (lost schema after a reboot) | no-op when healthy |
 | 2 | PVC `maven-repo` (2Gi, RWO) — the Maven cache | `oc apply` |
 | 3 | Applies the 2 Tasks and the Pipeline (shown in full) | `oc apply` |
 | 4 | `tkn pipeline start … --showlog` | new run each time |
@@ -57,6 +58,15 @@ Secrets are never printed: `show_cmd` displays `<ci-token>` / `<acs-api-token>` 
 ---
 
 ## Why Each Piece
+
+### Task order: implicit vs explicit
+
+The order of the tasks is not the order they appear in the YAML — Tekton builds a **DAG**:
+
+- **Implicit:** a task that consumes `$(tasks.<other>.results.<X>)` automatically runs after `<other>`. `acs-image-check` has **no `runAfter`**: it uses `$(tasks.build-image.results.IMAGE_DIGEST)`, and the digest cannot exist before the build, so the dependency is already there.
+- **Explicit:** `runAfter` is needed only when nothing is consumed. `build-jar` shares just the workspace with `fetch-source`, and `deploy-dev` / `deploy-gitops` use the digest from `build-image` — without `runAfter: [acs-image-check]` they would start **in parallel with the scan** and the gate would be worthless.
+
+> **Key point:** Data flow defines the order for free; `runAfter` is for ordering that carries no data — exactly the case of a security gate.
 
 ### Maven cache without RWX
 
@@ -101,6 +111,15 @@ ACS Central runs as a **cloud service**; it cannot reach `registry.apps.<cluster
 ./scripts/32-pipeline-build-deploy.sh
 ```
 
+The script explains the two kinds of input before starting the run:
+
+| Flag | What it passes | In this pipeline |
+|---|---|---|
+| `-p` | **Params** — strings, "what to do". `$(params.x)` in the YAML; `--use-param-defaults` fills in the ones you omit | `git-url`, `image-repo`, `deploy-mode`, … |
+| `-w` | **Workspaces** — volumes, "where to do it". Each task is its own Pod, so files travel over a shared volume; the Pipeline names it, the run decides what is behind it | `source` (`volumeClaimTemplateFile` → fresh PVC per run) · `maven-repo` (`claimName` → the persistent cache) · `registry-auth` (`secret` → push credentials as a file) |
+
+> **Key point:** Anything large or sensitive goes to a workspace, not a param — params are stored in plain text in the PipelineRun object, a Secret stays a Secret.
+
 Watch the run in the console while the logs stream in the terminal: **Pipelines → PipelineRuns → build-deploy-run-xxxxx** (graph turns green task by task).
 
 Re-run the pipeline by hand (same parameters):
@@ -139,7 +158,7 @@ oc get pvc maven-repo -n ocp-demo-cicd
 | `ACS Central URL not found` | Add `acs_url:https://<central>` to `keys.txt` in the repo root (git-ignored), or export `ACS_CENTRAL_URL` before running the script. |
 | `ACS API token not found` | Add `acs:<token>` to `keys.txt` in the repo root (git-ignored). Token role: Admin or a role allowed to manage integrations and scan images. |
 | `image-scan`: `could not scan image … 401` | ACS integration credentials missing/outdated — re-run the script (integration is upserted with the current CI token). |
-| `image-scan`: `create index … Database operation failed` / `relation "manifest_metadata" does not exist` | Scanner V4 DB in the secured cluster lost its schema (DB pod restarted after the indexer). Fix: `oc rollout restart deploy/scanner-v4-indexer -n rhacs-operator`. |
+| `image-scan`: `create index … Database operation failed` / `relation "manifest_metadata" does not exist` | The Scanner V4 indexer builds its schema only at startup, so a DB Pod that starts **after** the indexer (e.g. its PVC re-provisioned after a node reboot) leaves it talking to an empty database. The script pre-flights this and self-heals; to fix by hand: `oc rollout restart deploy/scanner-v4-indexer -n rhacs-operator`. |
 | `image-check`: `failed policies found … Fixable Severity at least Important` | The image has fixable Critical/Important CVEs and the policy is enforced at build — upgrade the dependency, rebuild (the Dockerfile's `microdnf update` picks up new RPM errata). This is the gate working (step 34). |
 | `deploy-dev`: `TaskRunImagePullFailed … image-registry.openshift-image-registry.svc:5000/openshift/cli` | The shipped `openshift-client` Task needs the internal registry (`Removed` on this cluster) — that is why `deploy-dev` is an inline task with `registry.redhat.io/openshift4/ose-cli-rhel9`. |
 | `TaskRunValidationFailed: more than one PersistentVolumeClaim is bound` | TektonConfig coschedule is `workspaces` — re-run `scripts/30-gitlab-setup.sh`. |

@@ -86,7 +86,10 @@ WEBHOOK_SECRET="$(oc get secret "${PAC_SECRET}" -n "${CICD_PROJECT}" -o jsonpath
 step "Secret '${PAC_SECRET}': GitLab API token (project token '${GITLAB_CI_TOKEN_NAME}') + webhook secret"
 show_cmd "oc create secret generic ${PAC_SECRET} -n ${CICD_PROJECT} \\
   --from-literal=provider.token=<gitlab-ci-token> \\
-  --from-literal=webhook.secret=<random>"
+  --from-literal=webhook.secret=<random>" \
+  "Create Secret (GitLab token + webhook secret)" \
+  "Console → Workloads → Secrets → Create → Key/value secret
+(or Console → Pipelines → Repositories → Create Repository: creates Secret + Repository together)"
 oc create secret generic "${PAC_SECRET}" -n "${CICD_PROJECT}" \
   --from-literal=provider.token="${CI_TOKEN}" --from-literal=webhook.secret="${WEBHOOK_SECRET}" \
   --dry-run=client -o yaml | oc apply -f - >/dev/null
@@ -94,15 +97,30 @@ ok "Secret '${PAC_SECRET}' ready"
 echo ""
 
 step "Repository CR: this GitLab project → PipelineRuns in '${CICD_PROJECT}'"
-show_cmd "$(render "${PAC_DIR}/repository.yaml")"
+show_cmd "$(render "${PAC_DIR}/repository.yaml")" \
+  "Create Pipelines-as-Code Repository" \
+  "Console → Pipelines → Repositories → Create Repository (Git repo URL, access token, webhook secret)"
 render "${PAC_DIR}/repository.yaml" | oc apply -f -
 echo ""
 pause
 
 step "GitLab project webhook → PAC controller (push, merge request, comment events)"
+echo ""
+echo -e "  ${BOLD}Webhook${RESET}            → created via the GitLab API — same as the UI:
+                     ${CYAN}Settings → Webhooks → Add new webhook${RESET}
+                     URL = PAC controller, Secret token = webhook.secret,
+                     triggers = Push, Merge request, Comments.
+  ${BOLD}Idempotent${RESET}         → if a hook with this URL already exists it is updated
+                     (PUT), otherwise created (POST) — never duplicated.
+  ${BOLD}At runtime${RESET}         → GitLab POSTs every event to the controller with header
+                     X-Gitlab-Token; PAC verifies it against the Secret."
+echo ""
 show_cmd "POST ${GL_API}/projects/${PROJECT_ENC}/hooks
   { url: ${PAC_WEBHOOK_URL},
-    token: <webhook-secret>, push_events, merge_requests_events, note_events }"
+    token: <webhook-secret>, push_events, merge_requests_events, note_events }" \
+  "Create GitLab project webhook" \
+  "GitLab → ${PROJECT_PATH} → Settings → Webhooks → Add new webhook
+  (URL, Secret token; triggers: Push, Merge request, Comments)"
 HOOK_BODY="$(jq -nc --arg u "${PAC_WEBHOOK_URL}" --arg t "${WEBHOOK_SECRET}" '{
   url: $u, token: $t, push_events: true, merge_requests_events: true, note_events: true,
   tag_push_events: false, enable_ssl_verification: false}')"
@@ -126,10 +144,14 @@ pause
 header "PART 3 — Add .tekton/ to the app repo"
 
 step ".tekton/push.yaml — on push to main: build, scan, deploy"
-show_cmd "$(render "${PAC_DIR}/push.yaml")"
+show_cmd "$(render "${PAC_DIR}/push.yaml")" \
+  "Prepare file .tekton/push.yaml" \
+  "GitLab → ${PROJECT_PATH} → Code → Web IDE → New file .tekton/push.yaml"
 step ".tekton/pull-request.yaml — on merge request to main: build + scan, deploy-mode=none"
 show_cmd "$(render "${PAC_DIR}/pull-request.yaml" | grep -E 'on-event|deploy|generateName|pipelineRef|name: build')
-  ... (same workspaces as push.yaml)"
+  ... (same workspaces as push.yaml)" \
+  "Prepare file .tekton/pull-request.yaml" \
+  "GitLab → ${PROJECT_PATH} → Code → Web IDE → New file .tekton/pull-request.yaml"
 
 ACTIONS="[]"
 for f in push pull-request; do
@@ -144,7 +166,9 @@ done
 step "Commit .tekton/ to main — this push is the first event Pipelines-as-Code reacts to"
 show_cmd "POST ${GL_API}/projects/${PROJECT_ENC}/repository/commits
   { branch: main, commit_message: \"Add Pipelines-as-Code PipelineRuns\",
-    actions: [ .tekton/push.yaml, .tekton/pull-request.yaml ] }"
+    actions: [ .tekton/push.yaml, .tekton/pull-request.yaml ] }" \
+  "Commit .tekton/ to main" \
+  "GitLab → Web IDE → Source control → Commit to main (both files in one commit)"
 if [[ "${ACTIONS}" == "[]" ]]; then
   ok ".tekton/ already up to date on main — no commit, no new run"
   PUSH_RUN=""
@@ -163,7 +187,14 @@ else
     || warn "PipelineRun '${PUSH_RUN}' (push): $(run_status "${PUSH_RUN}")"
   echo ""
   step "Status reported back to GitLab on the commit"
-  show_cmd "GET ${GL_API}/projects/${PROJECT_ENC}/repository/commits/${PUSH_SHA:0:8}/statuses"
+  echo ""
+  echo -e "  ${BOLD}Commit${RESET}             → ${CYAN}${PROJECT_URL}/-/commit/${PUSH_SHA}${RESET}
+                     pipeline status icon, links to the PipelineRun.
+  The API call below reads the same data the UI shows."
+  echo ""
+  show_cmd "GET ${GL_API}/projects/${PROJECT_ENC}/repository/commits/${PUSH_SHA:0:8}/statuses" \
+    "Read the commit's pipeline status" \
+    "GitLab → ${PROJECT_PATH} → Code → Commits → ${PUSH_SHA:0:8} → pipeline status icon"
   commit_statuses "${PUSH_SHA}"
   echo -e "  ${BOLD}GitLab:${RESET} ${CYAN}${PROJECT_URL}/-/commit/${PUSH_SHA}${RESET}  (pipeline status icon)"
 fi
@@ -185,7 +216,10 @@ step "Developer works on branch '${PAC_MR_BRANCH}': adds ${VULN_DEP_ARTIFACT} ${
 show_cmd "POST .../repository/branches   { branch: ${PAC_MR_BRANCH}, ref: main }
 PUT  .../repository/files/pom.xml { branch: ${PAC_MR_BRANCH}, commit_message: \"${VULN_COMMIT_MSG}\" }
 POST .../merge_requests           { source_branch: ${PAC_MR_BRANCH}, target_branch: main,
-                                    title: \"${PAC_MR_TITLE}\" }"
+                                    title: \"${PAC_MR_TITLE}\" }" \
+  "Create branch, commit pom.xml, open merge request" \
+  "GitLab → ${PROJECT_PATH} → Code → Branches → New branch
+pom.xml → Edit → Commit changes (on the branch) → Create merge request"
 gl_api POST "/projects/${PROJECT_ENC}/repository/branches?branch=${BRANCH_ENC}&ref=main" >/dev/null
 POM="$(gl_api GET "/projects/${PROJECT_ENC}/repository/files/pom.xml/raw?ref=${BRANCH_ENC}")"
 ANCHOR="<!-- OpenAPI / Swagger UI -->"
@@ -219,10 +253,20 @@ echo ""
 pause
 
 step "What the reviewer sees on the merge request"
+echo ""
+echo -e "  ${BOLD}Merge request${RESET}      → ${CYAN}${PROJECT_URL}/-/merge_requests/${MR_IID}${RESET}
+                     Pipelines tab / status widget: the PAC pipeline result.
+  ${BOLD}Commit${RESET}             → ${CYAN}${PROJECT_URL}/-/commit/${MR_SHA}${RESET}
+                     pipeline status icon, links to the PipelineRun.
+  The API calls below read the same data the UI shows."
+echo ""
 show_cmd "GET ${GL_API}/projects/${PROJECT_ENC}/merge_requests/${MR_IID}
-GET ${GL_API}/projects/${PROJECT_ENC}/repository/commits/${MR_SHA:0:8}/statuses"
+GET ${GL_API}/projects/${PROJECT_ENC}/repository/commits/${MR_SHA:0:8}/statuses" \
+  "Read the merge request's pipeline status" \
+  "GitLab → ${PROJECT_PATH} → Code → Merge requests → !${MR_IID} → Pipelines tab / status widget"
 commit_statuses "${MR_SHA}"
 echo -e "  ${BOLD}Merge request:${RESET} ${CYAN}${PROJECT_URL}/-/merge_requests/${MR_IID}${RESET}"
+echo -e "  ${BOLD}Commit       :${RESET} ${CYAN}${PROJECT_URL}/-/commit/${MR_SHA}${RESET}"
 echo -e "  ${BOLD}Dev still runs:${RESET} ${CYAN}$(oc get deployment "${APP_NAME}" -n "${DEV_PROJECT}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)${RESET}"
 echo ""
 cat <<'MSG'
@@ -235,7 +279,10 @@ pause
 
 step "Close the merge request (the developer will pick a safe logging library)"
 show_cmd "PUT ${GL_API}/projects/${PROJECT_ENC}/merge_requests/${MR_IID}  { state_event: close }
-DELETE ${GL_API}/projects/${PROJECT_ENC}/repository/branches/${BRANCH_ENC}"
+DELETE ${GL_API}/projects/${PROJECT_ENC}/repository/branches/${BRANCH_ENC}" \
+  "Close merge request + delete branch" \
+  "GitLab → merge request !${MR_IID} → Close merge request
+GitLab → Code → Branches → ${PAC_MR_BRANCH} → Delete"
 gl_api PUT "/projects/${PROJECT_ENC}/merge_requests/${MR_IID}" --data '{"state_event":"close"}' >/dev/null
 gl_api DELETE "/projects/${PROJECT_ENC}/repository/branches/${BRANCH_ENC}" >/dev/null
 ok "Merge request !${MR_IID} closed, branch '${PAC_MR_BRANCH}' deleted"
@@ -247,7 +294,9 @@ echo ""
 header "PART 5 — Recap"
 
 show_cmd "oc get repository ${APP_NAME} -n ${CICD_PROJECT}
-tkn pipelinerun list -n ${CICD_PROJECT} --limit 4"
+tkn pipelinerun list -n ${CICD_PROJECT} --limit 4" \
+  "List Repository + PipelineRuns" \
+  "Console → Pipelines → Repositories → ${APP_NAME} → PipelineRuns"
 oc get repositories.pipelinesascode.tekton.dev "${APP_NAME}" -n "${CICD_PROJECT}"
 echo ""
 tkn pipelinerun list -n "${CICD_PROJECT}" --limit 4

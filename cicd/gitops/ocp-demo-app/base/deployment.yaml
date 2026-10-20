@@ -20,6 +20,9 @@ spec:
           ports:
             - containerPort: 8080
               protocol: TCP
+          env:
+            - name: APP_COLOUR           # → app.colour, shown by /api/info; set per environment by the overlay
+              value: blue
           readinessProbe:
             httpGet:
               path: /q/health/ready

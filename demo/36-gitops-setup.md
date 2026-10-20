@@ -54,17 +54,19 @@ flowchart LR
 ```
 README.md
 base/
-  deployment.yaml        # image: ocp-demo-app (placeholder), probes, labels
+  deployment.yaml        # image: ocp-demo-app (placeholder), env APP_COLOUR=blue, probes, labels
   service.yaml
   route.yaml
   kustomization.yaml
 overlays/dev/
   kustomization.yaml     # namespace + images: newName …/ocp-demo-app, digest: sha256:…
   deployment-patch.yaml  # annotations ked-demo/git-commit, ked-demo/pipeline-run
+  env-patch.yaml         # app config for dev: APP_COLOUR (→ "colour" in /api/info)
 ```
 
 - **Kustomize**: environment-independent `base/`, environment-specific `overlays/dev/` (adding `overlays/prod/` later is a copy + a different namespace/image).
-- The overlay is **seeded with the image currently running** in `ocp-demo-dev`, and the base matches the live objects (same selector, ports, probe) → Argo CD finds nothing to change: **adoption without restart**.
+- The overlay is **seeded with the image currently running** in `ocp-demo-dev`, and the base matches the live objects (same selector, ports, probe, `APP_COLOUR=blue` set by step 32) → Argo CD finds nothing to change: **adoption without restart**.
+- `env-patch.yaml` is the dev configuration in Git — edit `APP_COLOUR` there to change the running app (see [step 38](38-gitops-drift-rollback.md#3-config-change--edit-git)).
 - Image by **digest**, never a floating tag.
 
 ---

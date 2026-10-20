@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 30-gitlab-setup.sh — ACT 5 PRE-DEMO: PostgreSQL 17 + GitLab Omnibus + app repo
-#                       (+ OpenShift Pipelines coschedule prep)
+#                       (+ OpenShift Pipelines coschedule prep, ACS Scanner V4 check)
 #
 # Run BEFORE the session (first boot takes ~5–10 min). Not presented live, so
 # no show_cmd/pause — same style as 00-setup.sh.
@@ -315,7 +315,13 @@ if [[ "${CA_CHANGED}" == true ]]; then
   ok "openshift-apiserver available"
 fi
 
-# ── Step 12: Verify ───────────────────────────────────────────────────────────
+# ── Step 12: ACS Scanner V4 schema (image scans in steps 32–37) ──────────────
+# Same guard 32/34 run before every pipeline — done here too so a lost
+# scanner-v4-db schema (e.g. after a node reboot) is fixed before the session.
+step "Checking ACS Scanner V4 (indexer schema vs. scanner-v4-db)..."
+ensure_acs_scanner_ready
+
+# ── Step 13: Verify ───────────────────────────────────────────────────────────
 step "Verifying..."
 RAILS_TABLES="$(oc exec -n "${GITLAB_NAMESPACE}" deploy/gitlab-postgresql -- \
   psql -U gitlab -d gitlabhq_production -tAc "select count(*) from information_schema.tables where table_schema='public';")"

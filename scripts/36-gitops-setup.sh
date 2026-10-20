@@ -87,7 +87,10 @@ GROUP_ID="$(gl_api GET "/groups/${GITLAB_GROUP}" | jq -r '.id // empty')"
 [[ -n "${GROUP_ID}" ]] || { warn "GitLab group '${GITLAB_GROUP}' not found"; exit 1; }
 step "GitLab project '${GITOPS_PATH}' (public: Argo CD reads it anonymously)"
 show_cmd "POST ${GL_API}/projects
-  { name: ${GITOPS_PROJECT}, namespace_id: <${GITLAB_GROUP}>, visibility: public }"
+  { name: ${GITOPS_PROJECT}, namespace_id: <${GITLAB_GROUP}>, visibility: public }" \
+  "Create GitLab project" \
+  "GitLab → Groups → ${GITLAB_GROUP} → New project → Create blank project
+  (name ${GITOPS_PROJECT}, Visibility: Public, no README)"
 GITOPS_ID="$(gl_api GET "/projects/${GITOPS_ENC}" | jq -r '.id // empty')"
 if [[ -n "${GITOPS_ID}" ]]; then
   ok "Project exists (id ${GITOPS_ID})"
@@ -102,7 +105,9 @@ echo ""
 
 step "Seed the manifests from ${GITOPS_SEED_DIR}/ — overlay pinned to the image running today"
 show_cmd "# ${GITOPS_SEED_DIR}/overlays/dev/kustomization.yaml (rendered)
-$(render "${GITOPS_SEED_DIR}/overlays/dev/kustomization.yaml")"
+$(render "${GITOPS_SEED_DIR}/overlays/dev/kustomization.yaml")" \
+  "Commit the initial manifests (Kustomize base + overlays/dev)" \
+  "GitLab → ${GITOPS_PATH} → Web IDE → add files → Commit to main (or git clone / add / commit / push)"
 HAS_COMMITS="$(gl_api GET "/projects/${GITOPS_ID}/repository/commits?per_page=1" | jq -r 'if type == "array" then length else 0 end')"
 if [[ "${HAS_COMMITS}" != "0" && "${GITOPS_RESEED:-0}" != "1" ]]; then
   ok "Repo already has commits — not re-seeding (GITOPS_RESEED=1 to overwrite the manifests)"
@@ -130,7 +135,10 @@ pause
 step "Write access for the pipeline: project token '${GITOPS_TOKEN_NAME}' → Secret '${GITOPS_SECRET}' in ${CICD_PROJECT}"
 show_cmd "POST ${GL_API}/projects/<id>/access_tokens  { name: ${GITOPS_TOKEN_NAME}, scopes: [read_repository, write_repository] }
 oc create secret generic ${GITOPS_SECRET} -n ${CICD_PROJECT} \\
-  --from-literal=username=<bot-user> --from-literal=password=<token>"
+  --from-literal=username=<bot-user> --from-literal=password=<token>" \
+  "Create project access token + Secret for the pipeline" \
+  "GitLab → ${GITOPS_PATH} → Settings → Access tokens → Add new token (Maintainer, read/write_repository)
+Console → Workloads → Secrets → Create → Key/value secret (username, password)"
 G_USER="$(oc get secret "${GITOPS_SECRET}" -n "${CICD_PROJECT}" -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || true)"
 G_TOKEN="$(oc get secret "${GITOPS_SECRET}" -n "${CICD_PROJECT}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)"
 # repository-only scopes: /personal_access_tokens/self still answers 200 for a valid token
@@ -157,7 +165,9 @@ echo ""
 
 step "Webhook: gitops repo → Argo CD (sync seconds after a commit instead of the 3-min poll)"
 show_cmd "POST ${GL_API}/projects/<id>/hooks
-  { url: ${ARGO_WEBHOOK_URL}, push_events: true }"
+  { url: ${ARGO_WEBHOOK_URL}, push_events: true }" \
+  "Create GitLab webhook → Argo CD" \
+  "GitLab → ${GITOPS_PATH} → Settings → Webhooks → Add new webhook (URL, trigger: Push events)"
 HOOK_BODY="$(jq -nc --arg u "${ARGO_WEBHOOK_URL}" '{url: $u, push_events: true, enable_ssl_verification: false}')"
 HOOK_ID="$(gl_api GET "/projects/${GITOPS_ID}/hooks" | jq -r --arg u "${ARGO_WEBHOOK_URL}" '.[]? | select(.url == $u) | .id' | head -1)"
 if [[ -n "${HOOK_ID}" ]]; then
@@ -174,7 +184,9 @@ pause
 header "PART 3 — Argo CD: project, repository, application"
 
 step "Allow the default Argo CD instance to manage '${DEV_PROJECT}'"
-show_cmd "oc label namespace ${DEV_PROJECT} argocd.argoproj.io/managed-by=${ARGO_NAMESPACE} --overwrite"
+show_cmd "oc label namespace ${DEV_PROJECT} argocd.argoproj.io/managed-by=${ARGO_NAMESPACE} --overwrite" \
+  "Label the namespace (managed by Argo CD)" \
+  "Console → Administration → Namespaces → ${DEV_PROJECT} → Actions → Edit labels"
 oc label namespace "${DEV_PROJECT}" "argocd.argoproj.io/managed-by=${ARGO_NAMESPACE}" --overwrite >/dev/null
 for _ in $(seq 1 30); do
   oc get rolebinding -n "${DEV_PROJECT}" -o name 2>/dev/null | grep -q "${ARGO_NAMESPACE}" && break
@@ -184,19 +196,27 @@ ok "Operator granted the Argo CD controller access to '${DEV_PROJECT}' (RoleBind
 echo ""
 
 step "AppProject '${ARGO_PROJECT}' (allowed repo, destination, kinds) + repository"
-show_cmd "$(render "${ARGO_DIR}/appproject.yaml")"
+show_cmd "$(render "${ARGO_DIR}/appproject.yaml")" \
+  "Create Argo CD AppProject + repository" \
+  "Argo CD → Settings → Projects → New project (source repos, destinations, allowed kinds)
+Argo CD → Settings → Repositories → Connect repo (HTTPS, anonymous)"
 render "${ARGO_DIR}/appproject.yaml" | oc apply -f -
 echo ""
 
 step "Pipeline may read Applications (it waits for the sync in step 37)"
-show_cmd "$(render "${ARGO_DIR}/rbac-pipeline.yaml" | grep -vE '^#')"
+show_cmd "$(render "${ARGO_DIR}/rbac-pipeline.yaml" | grep -vE '^#')" \
+  "Create Role + RoleBinding (pipeline reads Applications)" \
+  "Console → User Management → Roles → Create Role; RoleBindings → Create binding (project ${ARGO_NAMESPACE})"
 render "${ARGO_DIR}/rbac-pipeline.yaml" | oc apply -f -
 echo ""
 pause
 
 PODS_BEFORE="$(oc get pods -n "${DEV_PROJECT}" -l "app=${APP_NAME}" -o jsonpath='{.items[*].metadata.name}')"
 step "Application '${ARGO_APP}': ${GITOPS_OVERLAY} → ${DEV_PROJECT}, automated (prune + self-heal)"
-show_cmd "$(render "${ARGO_DIR}/application.yaml")"
+show_cmd "$(render "${ARGO_DIR}/application.yaml")" \
+  "Create Argo CD Application" \
+  "Argo CD → Applications → + New app (project ${ARGO_PROJECT}, repo, path ${GITOPS_OVERLAY},
+  namespace ${DEV_PROJECT}, Sync policy: Automatic + Prune + Self heal) → Create"
 render "${ARGO_DIR}/application.yaml" | oc apply -f -
 echo ""
 
@@ -220,7 +240,10 @@ pause
 header "PART 4 — Argo CD now owns ${DEV_PROJECT}"
 
 show_cmd "oc get application ${ARGO_APP} -n ${ARGO_NAMESPACE}
-oc get pods -n ${DEV_PROJECT} -l app=${APP_NAME}"
+oc get pods -n ${DEV_PROJECT} -l app=${APP_NAME}" \
+  "Inspect the Application + pods" \
+  "Argo CD → Applications → ${ARGO_APP} (resource tree)
+Console → Workloads → Pods (project ${DEV_PROJECT})"
 oc get application "${ARGO_APP}" -n "${ARGO_NAMESPACE}"
 echo ""
 oc get application "${ARGO_APP}" -n "${ARGO_NAMESPACE}" \

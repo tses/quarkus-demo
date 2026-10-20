@@ -2,7 +2,7 @@
 
 > **Script:** `scripts/38-gitops-drift-rollback.sh` (live, ~5 min)
 > **Prerequisites:** step 36 (Argo CD Application) and step 37 (at least one image commit by the pipeline)
-> **Overview:** Two everyday GitOps moments. Someone changes the cluster by hand — **Argo CD puts it back**. A release turns out bad — **`git revert`** in the gitops repo rolls it back, without pipelines or `oc`.
+> **Overview:** Everyday GitOps moments. Someone changes the cluster by hand — **Argo CD puts it back**. A release turns out bad — **`git revert`** in the gitops repo rolls it back, without pipelines or `oc`. A config change (`APP_COLOUR`) — **edit a file in Git** and the app changes.
 
 ---
 
@@ -33,6 +33,24 @@ sequenceDiagram
 - The deployment history **is** the history of `overlays/dev/kustomization.yaml`.
 - The script reverts the **latest commit that changed the overlay** (normally the last image commit by *Tekton CI*). Running it again reverts the revert → roll forward.
 - Argo CD's *Rollback* button is disabled while auto-sync is on — a UI rollback would be overwritten by the next sync. Git stays the source of truth.
+
+---
+
+## 3. Config Change — Edit Git
+
+Not scripted — do it live in GitLab whenever it fits (before/after the script, or between its pauses).
+
+1. Show the current value:
+   ```bash
+   curl -sk https://$(oc get route ocp-demo-app -n ocp-demo-dev -o jsonpath='{.spec.host}')/api/info   # "colour":"blue"
+   ```
+2. **GitLab → ked-demo/ocp-demo-app-gitops → `overlays/dev/env-patch.yaml` → Edit** → `value: blue` → `value: green` → *Commit to main*.
+3. **Argo CD UI**: *OutOfSync* → sync (webhook, seconds) → new ReplicaSet, rolling update.
+4. Same `curl` → `"colour":"green"`. Same image, new config — only Git changed.
+
+- `APP_COLOUR` is the env form of the Quarkus property `app.colour` (default `blue` in `application.properties`).
+- The change is in the **pod template** → new pods. (`deployment-patch.yaml` holds only Deployment metadata → no restart.)
+- Undo = revert that commit in GitLab (*Commits → Options → Revert*). The script's rollback (Part 2) is unaffected: it only looks at commits to `overlays/dev/kustomization.yaml`.
 
 ---
 

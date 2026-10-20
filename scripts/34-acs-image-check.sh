@@ -71,7 +71,9 @@ pause
 
 step "ACS policy '${ACS_GATE_POLICY}' (Central API)"
 show_cmd "curl -H 'Authorization: Bearer <acs-api-token>' ${ACS_CENTRAL_URL}/v1/policies/<id> \\
-  | jq '{name, lifecycleStages, enforcementActions, criteria}'"
+  | jq '{name, lifecycleStages, enforcementActions, criteria}'" \
+  "Inspect the ACS build-time policy" \
+  "ACS → Platform Configuration → Policy Management → '${ACS_GATE_POLICY}'"
 POLICY_ID="$(rox_api /v1/policies | jq -r --arg n "${ACS_GATE_POLICY}" '.policies[]? | select(.name == $n) | .id' | head -1)"
 [[ -n "${POLICY_ID}" ]] || { warn "Policy '${ACS_GATE_POLICY}' not found on Central"; exit 1; }
 POLICY="$(rox_api "/v1/policies/${POLICY_ID}")"
@@ -105,7 +107,9 @@ DEP_XML="    <!-- File logging -->
 step "Commit to 'main' in GitLab (as '${VULN_COMMIT_AUTHOR}') — pom.xml gets:"
 show_cmd "${DEP_XML}
 → PUT ${GL_API}/projects/${PROJECT_ENC}/repository/files/pom.xml
-  { branch: main, commit_message: \"${VULN_COMMIT_MSG}\", content: <new pom.xml> }"
+  { branch: main, commit_message: \"${VULN_COMMIT_MSG}\", content: <new pom.xml> }" \
+  "Commit a change to pom.xml (main)" \
+  "GitLab → ${GITLAB_GROUP}/${GITLAB_PROJECT} → Code → Repository → pom.xml → Edit → Commit changes"
 POM="$(pom_on_main)"
 BAD_COMMITTED=false
 if grep -q "<artifactId>${VULN_DEP_ARTIFACT}</artifactId>" <<< "${POM}"; then
@@ -136,12 +140,16 @@ header "PART 3 — Run the pipeline: the gate closes"
 echo -e "  ${BOLD}PipelineRuns:${RESET} ${CYAN}${CONSOLE_URL}/k8s/ns/${CICD_PROJECT}/tekton.dev~v1~PipelineRun${RESET}"
 if [[ "${BAD_COMMITTED}" == true ]] && pac_enabled; then
   step "Pipelines-as-Code is connected (step 35): the push already started the pipeline"
-  show_cmd "oc get pipelinerun -n ${CICD_PROJECT} -l pipelinesascode.tekton.dev/sha=${BAD_SHA:0:8}..."
+  show_cmd "oc get pipelinerun -n ${CICD_PROJECT} -l pipelinesascode.tekton.dev/sha=${BAD_SHA:0:8}..." \
+    "Find the PipelineRun started by the push" \
+    "Console → Pipelines → PipelineRuns (newest), or GitLab → commit → pipeline status icon"
   wait_pac_run "${BAD_SHA}"
   BAD_RUN="${PAC_RUN}"
 else
   step "Same pipeline as step 32 (with Pipelines-as-Code — step 35 — the push alone starts it)"
-  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... --showlog   # parameters/workspaces as in step 32"
+  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... --showlog   # parameters/workspaces as in step 32" \
+    "Start a PipelineRun" \
+    "Console → Pipelines → PipelineRuns → last run → Actions → Rerun"
   start_build_run
   BAD_RUN="$(last_build_run)"
 fi
@@ -155,7 +163,9 @@ echo ""
 pause
 
 step "Why it failed — the ACS findings for this image"
-show_cmd "tkn pipelinerun logs ${BAD_RUN} -n ${CICD_PROJECT} -t acs-image-check"
+show_cmd "tkn pipelinerun logs ${BAD_RUN} -n ${CICD_PROJECT} -t acs-image-check" \
+  "Read the acs-image-check logs" \
+  "Console → Pipelines → PipelineRuns → ${BAD_RUN} → Logs → acs-image-check"
 ACS_LOG="$(tkn pipelinerun logs "${BAD_RUN}" -n "${CICD_PROJECT}" -t acs-image-check 2>/dev/null || true)"
 echo -e "  ${BOLD}CRITICAL vulnerabilities (image-scan):${RESET}"
 awk -F'|' '/\[acs-image-check : image-scan\] \|/ && $5 ~ /CRITICAL/ {
@@ -188,7 +198,9 @@ header "PART 4 — Fix it: revert the commit"
 REVERT_SHA=""
 step "Revert the vulnerable commit in GitLab"
 show_cmd "POST ${GL_API}/projects/${PROJECT_ENC}/repository/commits/${BAD_SHA:-<sha>}/revert
-  { branch: main }"
+  { branch: main }" \
+  "Revert the commit" \
+  "GitLab → ${GITLAB_GROUP}/${GITLAB_PROJECT} → Code → Commits → the commit → Options → Revert"
 if grep -q "<artifactId>${VULN_DEP_ARTIFACT}</artifactId>" <<< "$(pom_on_main)"; then
   [[ -n "${BAD_SHA}" ]] || { warn "Could not find the commit '${VULN_COMMIT_MSG}' to revert"; exit 1; }
   RESP="$(gl_api POST "/projects/${PROJECT_ENC}/repository/commits/${BAD_SHA}/revert" --data '{"branch":"main"}')"
@@ -207,7 +219,9 @@ if [[ -n "${REVERT_SHA}" ]] && pac_enabled; then
   GOOD_RUN="${PAC_RUN}"
 else
   step "Run the pipeline again"
-  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... --showlog"
+  show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} ... --showlog" \
+    "Start a PipelineRun" \
+    "Console → Pipelines → PipelineRuns → last run → Actions → Rerun"
   start_build_run
   GOOD_RUN="$(last_build_run)"
 fi
@@ -225,7 +239,9 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 header "PART 5 — Recap"
 
-show_cmd "tkn pipelinerun list -n ${CICD_PROJECT} --limit 3"
+show_cmd "tkn pipelinerun list -n ${CICD_PROJECT} --limit 3" \
+  "List PipelineRuns" \
+  "Console → Pipelines → PipelineRuns"
 tkn pipelinerun list -n "${CICD_PROJECT}" --limit 3
 echo ""
 echo -e "  ${BOLD}Running in ${DEV_PROJECT}:${RESET} ${CYAN}$(dev_image)${RESET}"

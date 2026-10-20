@@ -49,7 +49,9 @@ pause
 
 step "Operator + its single config object (TektonConfig)"
 show_cmd "oc get csv -n openshift-operators | grep -i pipelines
-oc get tektonconfig config"
+oc get tektonconfig config" \
+  "Inspect the Pipelines operator + TektonConfig" \
+  "Console → Operators → Installed Operators → Red Hat OpenShift Pipelines → Tekton Configuration"
 oc get csv -n openshift-operators --no-headers 2>/dev/null | grep -i pipelines \
   | awk '{print "  " $1 "   " $NF}' || warn "OpenShift Pipelines operator not found"
 echo ""
@@ -59,7 +61,9 @@ pause
 
 step "What the operator deployed (one TektonConfig → several components)"
 show_cmd "oc get tektonpipeline,tektontrigger,tektonchain,tektonresult,openshiftpipelinesascode
-tkn version"
+tkn version" \
+  "List the Tekton components" \
+  "Console → Operators → Installed Operators → Red Hat OpenShift Pipelines → All instances"
 oc get tektonpipeline,tektontrigger,tektonchain,tektonresult,openshiftpipelinesascode 2>/dev/null
 echo ""
 tkn version
@@ -81,7 +85,9 @@ header "PART 2 — Don't write everything: ready-made Tasks"
 
 step "Tasks shipped with OpenShift Pipelines (namespace ${TEKTON_NAMESPACE})"
 show_cmd "tkn task list -n ${TEKTON_NAMESPACE} -o name | sed 's|.*/||' \\
-  | grep -Ev -- '-[0-9]+-[0-9]+-[0-9]+\$' | column -c 100"
+  | grep -Ev -- '-[0-9]+-[0-9]+-[0-9]+\$' | column -c 100" \
+  "List ready-made Tasks" \
+  "Console → Pipelines → Tasks (project ${TEKTON_NAMESPACE}), or Pipeline builder → Add task"
 tkn task list -n "${TEKTON_NAMESPACE}" -o name | sed 's|.*/||' \
   | grep -Ev -- '-[0-9]+-[0-9]+-[0-9]+$' | column -c 100
 echo ""
@@ -91,7 +97,9 @@ echo ""
 pause
 
 step "Anatomy of a Task: git-clone — params in, results out, workspaces to share files"
-show_cmd "tkn task describe git-clone -n ${TEKTON_NAMESPACE}"
+show_cmd "tkn task describe git-clone -n ${TEKTON_NAMESPACE}" \
+  "Describe Task git-clone" \
+  "Console → Pipelines → Tasks (project ${TEKTON_NAMESPACE}) → git-clone → YAML"
 tkn task describe git-clone -n "${TEKTON_NAMESPACE}" \
   | sed -n '/Params/,/Steps/p' | sed '$d' | grep -v '^$' | grep -v -- '---$'
 echo ""
@@ -103,7 +111,9 @@ pause
 header "PART 3 — Step → Task: our first Task"
 
 step "Project for the CI pipelines: ${CICD_PROJECT}"
-show_cmd "oc new-project ${CICD_PROJECT} --display-name='${CICD_PROJECT_DISPLAY}'"
+show_cmd "oc new-project ${CICD_PROJECT} --display-name='${CICD_PROJECT_DISPLAY}'" \
+  "Create project" \
+  "Console → Home → Projects → Create Project"
 if oc get project "${CICD_PROJECT}" &>/dev/null; then
   ok "Project '${CICD_PROJECT}' already exists"
 else
@@ -122,13 +132,17 @@ step "Task 'hello': 1 param, 1 result, 2 steps"
 show_cmd "# ${HELLO_TASK}
 $(cat "${HELLO_TASK}")
 
-→ oc apply -n ${CICD_PROJECT} -f ${HELLO_TASK}"
+→ oc apply -n ${CICD_PROJECT} -f ${HELLO_TASK}" \
+  "Create Task 'hello'" \
+  "Console → Pipelines → Tasks → Create → Task (paste the YAML)"
 oc apply -n "${CICD_PROJECT}" -f "${HELLO_TASK}"
 echo ""
 pause
 
 step "Run it: a TaskRun → one Pod, one container per step"
-show_cmd "tkn task start hello -n ${CICD_PROJECT} -p name=KED --showlog"
+show_cmd "tkn task start hello -n ${CICD_PROJECT} -p name=KED --showlog" \
+  "Start a TaskRun" \
+  "Console → + (Import YAML) → kind: TaskRun, taskRef: hello → TaskRun → Logs"
 tkn task start hello -n "${CICD_PROJECT}" -p name=KED --showlog
 echo ""
 
@@ -137,7 +151,9 @@ TR="$(oc get taskrun -n "${CICD_PROJECT}" -l tekton.dev/task=hello \
 step "Behind the scenes: TaskRun '${TR}'"
 show_cmd "oc get pod -n ${CICD_PROJECT} -l tekton.dev/taskRun=${TR} \\
   -o jsonpath='{.items[0].spec.containers[*].name}'
-tkn taskrun describe ${TR} -n ${CICD_PROJECT}"
+tkn taskrun describe ${TR} -n ${CICD_PROJECT}" \
+  "Inspect the TaskRun and its Pod" \
+  "Console → Pipelines → TaskRuns → ${TR} → Details / Logs / Pod"
 echo -e "  Containers of the Pod : ${CYAN}$(oc get pod -n "${CICD_PROJECT}" -l "tekton.dev/taskRun=${TR}" \
   -o jsonpath='{.items[0].spec.containers[*].name}')${RESET}"
 echo ""
@@ -160,7 +176,9 @@ step "Pipeline 'inspect-source': git-clone (cluster resolver) → inline Task"
 show_cmd "# ${INTRO_PIPELINE}
 $(cat "${INTRO_PIPELINE}")
 
-→ oc apply -n ${CICD_PROJECT} -f ${INTRO_PIPELINE}"
+→ oc apply -n ${CICD_PROJECT} -f ${INTRO_PIPELINE}" \
+  "Create Pipeline 'inspect-source'" \
+  "Console → Pipelines → Create → Pipeline (Pipeline builder or YAML view)"
 oc apply -n "${CICD_PROJECT}" -f "${INTRO_PIPELINE}"
 echo ""
 cat <<'MSG'
@@ -178,7 +196,9 @@ $(cat "${WS_TEMPLATE}")
 → tkn pipeline start inspect-source -n ${CICD_PROJECT} \\
     -p git-url=${GIT_URL} \\
     -w name=source,volumeClaimTemplateFile=${WS_TEMPLATE} \\
-    --use-param-defaults --showlog"
+    --use-param-defaults --showlog" \
+  "Start a PipelineRun" \
+  "Console → Pipelines → inspect-source → Actions → Start (git-url, workspace: VolumeClaimTemplate)"
 tkn pipeline start inspect-source -n "${CICD_PROJECT}" \
   -p git-url="${GIT_URL}" \
   -w name=source,volumeClaimTemplateFile="${WS_TEMPLATE}" \
@@ -194,7 +214,9 @@ pause
 
 step "One PipelineRun → one TaskRun (and Pod) per task"
 show_cmd "tkn pipelinerun describe ${PR} -n ${CICD_PROJECT}
-oc get taskrun,pod -n ${CICD_PROJECT} -l tekton.dev/pipelineRun=${PR}"
+oc get taskrun,pod -n ${CICD_PROJECT} -l tekton.dev/pipelineRun=${PR}" \
+  "Inspect the PipelineRun" \
+  "Console → Pipelines → PipelineRuns → ${PR} → Details / TaskRuns / Logs"
 tkn pipelinerun describe "${PR}" -n "${CICD_PROJECT}" | sed -n '/Workspaces/,$p' | grep -v '^$'
 echo ""
 oc get taskrun,pod -n "${CICD_PROJECT}" -l "tekton.dev/pipelineRun=${PR}"

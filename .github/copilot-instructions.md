@@ -18,6 +18,10 @@ The scripts are meant to be run live in front of an audience, so they follow a
   - `show_cmd "..."` to display a command or YAML block in a box and wait for
     ENTER *before executing it*, so the presenter can explain what will run.
     After `show_cmd`, actually run the same command that was shown.
+    Optional 2nd/3rd args: the action (verb + object, used as the box title)
+    and the equivalent UI path, e.g.
+    `show_cmd "POST .../projects" "Create GitLab project" "GitLab → Group → New project → Create blank project"`.
+    Scripts `31`–`38` pass both for every `show_cmd`.
 - Keep scripts **idempotent** (when doable): re-running a script should
   re-apply/re-check resources without erroring. Use patterns already in the
   repo, e.g. `oc apply`, `oc ... --ignore-not-found`, create-or-reuse guards

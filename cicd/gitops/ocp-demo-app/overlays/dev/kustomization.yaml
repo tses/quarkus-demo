@@ -5,6 +5,7 @@ resources:
 - ../../base
 patches:
 - path: deployment-patch.yaml
+- path: env-patch.yaml
 images:
 - digest: ${IMAGE_DIGEST}
   name: ocp-demo-app

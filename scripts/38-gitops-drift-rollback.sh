@@ -52,7 +52,9 @@ MSG
 echo ""
 
 step "Scale the deployment to 3 replicas with oc"
-show_cmd "oc scale deployment ${APP_NAME} --replicas=3 -n ${DEV_PROJECT}"
+show_cmd "oc scale deployment ${APP_NAME} --replicas=3 -n ${DEV_PROJECT}" \
+  "Scale the deployment (manual drift)" \
+  "Console → Workloads → Deployments → ${APP_NAME} → Details → ▲ pod count arrow"
 oc scale deployment "${APP_NAME}" --replicas=3 -n "${DEV_PROJECT}"
 for i in $(seq 1 30); do
   R="$(replicas)"
@@ -66,7 +68,9 @@ echo ""
 pause
 
 step "Delete the Service"
-show_cmd "oc delete service ${APP_NAME} -n ${DEV_PROJECT}"
+show_cmd "oc delete service ${APP_NAME} -n ${DEV_PROJECT}" \
+  "Delete the Service" \
+  "Console → Networking → Services → ${APP_NAME} → Actions → Delete Service"
 oc delete service "${APP_NAME}" -n "${DEV_PROJECT}" --wait=true
 for i in $(seq 1 30); do
   oc get service "${APP_NAME}" -n "${DEV_PROJECT}" &>/dev/null && break
@@ -90,7 +94,9 @@ pause
 header "PART 2 — A bad release? Roll back with git revert"
 
 step "Deployment history = history of the overlay in the gitops repo"
-show_cmd "GET ${GL_API}/projects/${GITOPS_ENC}/repository/commits?path=${OVERLAY_FILE}"
+show_cmd "GET ${GL_API}/projects/${GITOPS_ENC}/repository/commits?path=${OVERLAY_FILE}" \
+  "List the overlay's commit history" \
+  "GitLab → ${GITOPS_PATH} → Code → Repository → ${OVERLAY_FILE} → History"
 HISTORY="$(gl_api GET "/projects/${GITOPS_ENC}/repository/commits?ref_name=main&path=${OVERLAY_FILE//\//%2F}&per_page=5")"
 jq -r '.[] | "  \(.short_id)  \(.created_at[0:19])  \(.author_name)  \(.title)"' <<< "${HISTORY}"
 TARGET_SHA="$(jq -r '.[0].id // empty' <<< "${HISTORY}")"
@@ -106,7 +112,9 @@ echo ""
 pause
 
 step "Revert '${TARGET_TITLE}' (${TARGET_SHA:0:8})"
-show_cmd "POST ${GL_API}/projects/${GITOPS_ENC}/repository/commits/${TARGET_SHA:0:8}/revert  { branch: main }"
+show_cmd "POST ${GL_API}/projects/${GITOPS_ENC}/repository/commits/${TARGET_SHA:0:8}/revert  { branch: main }" \
+  "Revert the commit" \
+  "GitLab → ${GITOPS_PATH} → Code → Commits → ${TARGET_SHA:0:8} → Options → Revert"
 RESP="$(gl_api POST "/projects/${GITOPS_ENC}/repository/commits/${TARGET_SHA}/revert" --data '{"branch":"main"}')"
 REVERT_SHA="$(jq -r '.id // empty' <<< "${RESP}")"
 [[ -n "${REVERT_SHA}" ]] || { warn "Revert failed: ${RESP}"; exit 1; }
@@ -129,7 +137,9 @@ echo ""
 pause
 
 step "Argo CD sync history"
-show_cmd "oc get application ${ARGO_APP} -n ${ARGO_NAMESPACE} -o jsonpath='{.status.history}'"
+show_cmd "oc get application ${ARGO_APP} -n ${ARGO_NAMESPACE} -o jsonpath='{.status.history}'" \
+  "Show the Argo CD sync history" \
+  "Argo CD → Applications → ${ARGO_APP} → History and rollback"
 app_field '{.status.history}' | jq -r '.[-4:][] | "  #\(.id)  \(.deployedAt)  \(.revision[0:8])"'
 echo ""
 cat <<'MSG'
@@ -138,6 +148,8 @@ cat <<'MSG'
     the source of truth (a UI rollback would be undone by the next sync)
   • Roll forward: the next pipeline run (push to the app repo) commits a new
     image; running this script again reverts the revert
+  • Config is Git too: edit overlays/dev/env-patch.yaml (APP_COLOUR blue → green)
+    in GitLab → Argo CD rolls out new pods → /api/info shows the new colour
 MSG
 echo ""
 ok "GitOps: drift self-healed, rollback done through Git."

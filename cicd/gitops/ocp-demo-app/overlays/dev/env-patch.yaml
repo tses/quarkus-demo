@@ -1,0 +1,15 @@
+# App configuration for dev — edit in Git (e.g. APP_COLOUR: blue → green) and
+# Argo CD rolls out new pods; GET /api/info then returns the new "colour".
+# Pod template → a change here restarts the pods (unlike deployment-patch.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocp-demo-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: ocp-demo-app
+          env:
+            - name: APP_COLOUR
+              value: blue

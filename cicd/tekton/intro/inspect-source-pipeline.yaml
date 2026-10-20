@@ -27,7 +27,7 @@ spec:
       workspaces:
         - { name: output, workspace: source }
 
-    - name: inspect-source               # runs after fetch-source: it consumes its result
+    - name: inspect-source               # no runAfter: consuming fetch-source's COMMIT result already orders it after fetch-source
       params:
         - { name: commit, value: $(tasks.fetch-source.results.COMMIT) }
       workspaces:

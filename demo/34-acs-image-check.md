@@ -82,7 +82,7 @@ The commit added to `pom.xml`:
 
 1. **ACS → Platform Configuration → Policy Management** → *Fixable Severity at least Important*: criteria, lifecycle, **enforcement** on Build.
 2. **GitLab → commit** "Add log4j-core for file logging": an innocent-looking one-line change.
-3. **Console → PipelineRun graph**: green up to `build-image`, red `acs-image-check`, `deploy-dev` never started.
+3. **Console → PipelineRun graph**: green up to `build-image`, red `acs-image-check`, `deploy-dev` never started — the gate holds because of `runAfter: [acs-image-check]` on the deploy tasks ([why](32-pipeline-build-deploy.md#task-order-implicit-vs-explicit)).
 4. **`acs-image-check` logs**: `log4j-core 2.14.1 … CVE-2021-44228 … CRITICAL … fixed 2.15.0`, `Policy "Fixable Severity at least Important"`, `failed policies found`.
 5. **GitLab → Container Registry**: the vulnerable image *was* pushed — it is just never deployed. (Deploy-time enforcement of the same policy would also stop a manual `oc set image`.)
 6. **Topology `ocp-demo-dev`**: still the previous image; after the revert, a new rollout with the revert commit in the `ked-demo/git-commit` annotation.

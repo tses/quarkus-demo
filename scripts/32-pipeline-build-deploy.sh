@@ -80,7 +80,10 @@ header "PART 2 — Prepare projects, credentials and cache"
 
 step "Projects: pipelines run in '${CICD_PROJECT}', the app is deployed to '${DEV_PROJECT}'"
 show_cmd "oc new-project ${DEV_PROJECT}
-oc policy add-role-to-user edit system:serviceaccount:${CICD_PROJECT}:pipeline -n ${DEV_PROJECT}"
+oc policy add-role-to-user edit system:serviceaccount:${CICD_PROJECT}:pipeline -n ${DEV_PROJECT}" \
+  "Create project + grant the pipeline SA the edit role" \
+  "Console → Home → Projects → Create Project
+Console → User Management → RoleBindings → Create binding (ServiceAccount ${CICD_PROJECT}/pipeline, ClusterRole edit)"
 for ns in "${CICD_PROJECT}:${CICD_PROJECT_DISPLAY}" "${DEV_PROJECT}:${DEV_PROJECT_DISPLAY}"; do
   oc get project "${ns%%:*}" &>/dev/null || \
     oc new-project "${ns%%:*}" --display-name="${ns#*:}" --skip-config-write >/dev/null
@@ -98,7 +101,10 @@ pause
 step "Registry credentials: push from the pipeline, pull in the dev project (GitLab token '${GITLAB_CI_TOKEN_NAME}')"
 show_cmd "oc create secret docker-registry ${REGISTRY_SECRET} --docker-server=${REG_HOST} \\
   --docker-username=${CI_USER} --docker-password=<ci-token> -n ${CICD_PROJECT}   # + same in ${DEV_PROJECT}
-oc secrets link default ${REGISTRY_SECRET} --for=pull -n ${DEV_PROJECT}"
+oc secrets link default ${REGISTRY_SECRET} --for=pull -n ${DEV_PROJECT}" \
+  "Create registry Secret + link it for image pulls" \
+  "Console → Workloads → Secrets → Create → Image pull secret (in both projects)
+Console → User Management → ServiceAccounts → default → YAML: add to imagePullSecrets"
 for ns in "${CICD_PROJECT}" "${DEV_PROJECT}"; do
   oc create secret docker-registry "${REGISTRY_SECRET}" -n "${ns}" --docker-server="${REG_HOST}" \
     --docker-username="${CI_USER}" --docker-password="${CI_TOKEN}" --dry-run=client -o yaml | oc apply -f - >/dev/null
@@ -112,7 +118,10 @@ step "ACS: API token for roxctl (Secret '${ACS_SECRET}') — the token stays out
 show_cmd "oc create secret generic ${ACS_SECRET} -n ${CICD_PROJECT} \\
   --from-literal=endpoint=${ACS_ENDPOINT} \\
   --from-literal=token=<acs-api-token> \\
-  --from-literal=cluster=${ACS_CLUSTER_NAME}"
+  --from-literal=cluster=${ACS_CLUSTER_NAME}" \
+  "Create Secret with the ACS API token" \
+  "ACS → Platform Configuration → Integrations → API Token → Generate token
+Console → Workloads → Secrets → Create → Key/value secret"
 oc create secret generic "${ACS_SECRET}" -n "${CICD_PROJECT}" \
   --from-literal=endpoint="${ACS_ENDPOINT}" --from-literal=token="${ACS_TOKEN}" \
   --from-literal=cluster="${ACS_CLUSTER_NAME}" --dry-run=client -o yaml | oc apply -f - >/dev/null
@@ -124,7 +133,10 @@ show_cmd "POST/PUT ${ACS_CENTRAL_URL}/v1/imageintegrations
   { name: ${ACS_REGISTRY_INTEGRATION}, type: docker, endpoint: ${REG_HOST},
     username: ${CI_USER}, password: <ci-token>, insecure: true }
 GET/PUT ${ACS_CENTRAL_URL}/v1/delegatedregistryconfig
-  registries += { path: ${REG_HOST}, cluster: ${ACS_CLUSTER_NAME} }"
+  registries += { path: ${REG_HOST}, cluster: ${ACS_CLUSTER_NAME} }" \
+  "Create ACS registry integration + enable delegated scanning" \
+  "ACS → Platform Configuration → Integrations → Generic Docker Registry → New integration
+ACS → Platform Configuration → Clusters → Delegated image scanning → add registry"
 INTEG_ID="$(rox_api GET /v1/imageintegrations \
   | jq -r --arg n "${ACS_REGISTRY_INTEGRATION}" '.integrations[]? | select(.name == $n) | .id' | head -1)"
 INTEG_BODY="$(jq -nc --arg n "${ACS_REGISTRY_INTEGRATION}" --arg ep "${REG_HOST}" \
@@ -156,6 +168,14 @@ fi
 echo ""
 pause
 
+step "ACS Scanner V4 pre-flight: the indexer builds its DB schema only at startup"
+echo -e "  A node reboot can re-provision the scanner-v4-db PVC and leave the indexer"
+echo -e "  talking to an empty database — every scan then fails with 'Database operation"
+echo -e "  failed'. Restarting the indexer rebuilds the schema (no-op when it is intact)."
+ensure_acs_scanner_ready
+echo ""
+pause
+
 step "Maven cache: a persistent PVC, mounted as a second workspace by every run"
 show_cmd "oc apply -n ${CICD_PROJECT} -f - <<EOF
 apiVersion: v1
@@ -167,7 +187,9 @@ spec:
   resources:
     requests:
       storage: ${MAVEN_CACHE_SIZE}
-EOF"
+EOF" \
+  "Create PVC for the Maven cache" \
+  "Console → Storage → PersistentVolumeClaims → Create PersistentVolumeClaim"
 cat <<EOF | oc apply -n "${CICD_PROJECT}" -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -190,14 +212,18 @@ header "PART 3 — Our Tasks and the Pipeline"
 
 step "Task 'maven-cached': Maven with -Dmaven.repo.local on the cache workspace"
 show_cmd "# ${BUILD_DIR}/task-maven-cached.yaml
-$(cat "${BUILD_DIR}/task-maven-cached.yaml")"
+$(cat "${BUILD_DIR}/task-maven-cached.yaml")" \
+  "Create Task 'maven-cached'" \
+  "Console → Pipelines → Tasks → Create → Task (paste the YAML)"
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/task-maven-cached.yaml"
 echo ""
 pause
 
 step "Task 'acs-image-check': roxctl image scan (report) + image check (gate)"
 show_cmd "# ${BUILD_DIR}/task-acs-image-check.yaml
-$(cat "${BUILD_DIR}/task-acs-image-check.yaml")"
+$(cat "${BUILD_DIR}/task-acs-image-check.yaml")" \
+  "Create Task 'acs-image-check'" \
+  "Console → Pipelines → Tasks → Create → Task (paste the YAML)"
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/task-acs-image-check.yaml"
 # GitOps delivery task (explained in step 37) — referenced by the pipeline, skipped while deploy-mode=oc
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/task-gitops-update-image.yaml" >/dev/null
@@ -206,7 +232,9 @@ pause
 
 step "Pipeline 'build-deploy': 2 shipped Tasks (cluster resolver) + 2 of ours + 1 inline"
 show_cmd "# ${BUILD_DIR}/pipeline-build-deploy.yaml
-$(cat "${BUILD_DIR}/pipeline-build-deploy.yaml")"
+$(cat "${BUILD_DIR}/pipeline-build-deploy.yaml")" \
+  "Create Pipeline '${PIPELINE_NAME}'" \
+  "Console → Pipelines → Create → Pipeline (Pipeline builder or YAML view)"
 oc apply -n "${CICD_PROJECT}" -f "${BUILD_DIR}/pipeline-build-deploy.yaml"
 echo ""
 echo -e "  ${BOLD}Graph in the console:${RESET} ${CYAN}${CONSOLE_URL}/k8s/ns/${CICD_PROJECT}/tekton.dev~v1~Pipeline/${PIPELINE_NAME}${RESET}"
@@ -225,6 +253,17 @@ header "PART 4 — Run the pipeline"
 
 step "Start a PipelineRun (watch the graph in the console while the logs stream here)"
 echo -e "  ${BOLD}PipelineRuns:${RESET} ${CYAN}${CONSOLE_URL}/k8s/ns/${CICD_PROJECT}/tekton.dev~v1~PipelineRun${RESET}"
+echo ""
+echo -e "  ${BOLD}-p = params${RESET}      → data (strings): \"what to do\". Declared in spec.params,
+                     used as \$(params.x). --use-param-defaults fills in the rest
+                     (git-revision=main, gitops-*). Visible in the PipelineRun YAML.
+  ${BOLD}-w = workspaces${RESET}  → storage (volumes): \"where to do it\". Each task is its own
+                     Pod, so files travel over a shared volume. The Pipeline names
+                     the workspace, the run decides what is behind it:
+    • source         volumeClaimTemplateFile → fresh PVC per run, deleted at the end
+    • maven-repo     claimName → existing PVC, the Maven cache across runs
+    • registry-auth  secret    → Secret mounted as a file (push credentials)"
+echo ""
 show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} \\
   -p git-url=${GIT_URL} \\
   -p image-repo=${IMAGE_REPO} \\
@@ -233,7 +272,10 @@ show_cmd "tkn pipeline start ${PIPELINE_NAME} -n ${CICD_PROJECT} \\
   -w name=source,volumeClaimTemplateFile=${WS_TEMPLATE} \\
   -w name=maven-repo,claimName=${MAVEN_CACHE_PVC} \\
   -w name=registry-auth,secret=${REGISTRY_SECRET} \\
-  --use-param-defaults --showlog"
+  --use-param-defaults --showlog" \
+  "Start a PipelineRun" \
+  "Console → Pipelines → ${PIPELINE_NAME} → Actions → Start
+  (params; workspaces: VolumeClaimTemplate / PersistentVolumeClaim / Secret)"
 start_build_run
 PR="$(last_build_run)"
 echo ""
@@ -253,7 +295,9 @@ pause
 header "PART 5 — What the pipeline produced"
 
 step "Pipeline results and task durations"
-show_cmd "tkn pipelinerun describe ${PR} -n ${CICD_PROJECT}"
+show_cmd "tkn pipelinerun describe ${PR} -n ${CICD_PROJECT}" \
+  "Inspect PipelineRun results" \
+  "Console → Pipelines → PipelineRuns → ${PR} → Details (Results) / TaskRuns"
 tkn pipelinerun describe "${PR}" -n "${CICD_PROJECT}" | sed -n '/Results/,$p' | grep -v '^$'
 echo ""
 pause
@@ -262,7 +306,10 @@ step "The app in '${DEV_PROJECT}' runs the image by digest, annotated with the G
 show_cmd "oc get deployment ${APP_NAME} -n ${DEV_PROJECT} \\
   -o jsonpath='{.spec.template.spec.containers[0].image}'
 oc get deployment ${APP_NAME} -n ${DEV_PROJECT} -o jsonpath='{.metadata.annotations}'
-curl -sk https://\$(oc get route ${APP_NAME} -n ${DEV_PROJECT} -o jsonpath='{.spec.host}')/api/info"
+curl -sk https://\$(oc get route ${APP_NAME} -n ${DEV_PROJECT} -o jsonpath='{.spec.host}')/api/info" \
+  "Inspect the deployed image + call the app" \
+  "Console → Workloads → Deployments → ${APP_NAME} → YAML (image, annotations)
+Console → Networking → Routes → ${APP_NAME} → Location"
 echo -e "  Image      : ${CYAN}$(oc get deployment "${APP_NAME}" -n "${DEV_PROJECT}" -o jsonpath='{.spec.template.spec.containers[0].image}')${RESET}"
 echo -e "  Git commit : ${CYAN}$(oc get deployment "${APP_NAME}" -n "${DEV_PROJECT}" -o jsonpath='{.metadata.annotations.ked-demo/git-commit}')${RESET}"
 APP_HOST="$(oc get route "${APP_NAME}" -n "${DEV_PROJECT}" -o jsonpath='{.spec.host}')"
@@ -284,7 +331,9 @@ echo -e "  Maven took ${BOLD}${FIRST_MVN}${RESET} in run '${PR}' (Maven cache PV
 echo -n "  Start a second run to show the cached Maven repository? (y/N): "
 read -r AGAIN
 if [[ "${AGAIN}" =~ ^[Yy] ]]; then
-  show_cmd "tkn pipeline start ${PIPELINE_NAME} ... (same parameters and workspaces)"
+  show_cmd "tkn pipeline start ${PIPELINE_NAME} ... (same parameters and workspaces)" \
+    "Start a second PipelineRun" \
+    "Console → Pipelines → PipelineRuns → ${PR} → Actions → Rerun"
   start_build_run
   PR2="$(last_build_run)"
   echo ""

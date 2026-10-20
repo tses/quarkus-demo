@@ -49,6 +49,9 @@ spec:
     - name: COMMIT
       value: $(tasks.fetch-source.results.COMMIT)
   tasks:
+    # Task order in the DAG comes from two sources:
+    #   · implicit — a task consuming $(tasks.<other>.results.<X>) runs after <other>
+    #   · explicit — `runAfter`, needed only when no result is consumed
     - name: fetch-source
       taskRef:
         resolver: cluster
@@ -64,7 +67,7 @@ spec:
         - { name: output, workspace: source }
 
     - name: build-jar
-      runAfter: [fetch-source]
+      runAfter: [fetch-source]          # explicit: only the workspace is shared, no result consumed
       taskRef:
         name: maven-cached
       params:
@@ -75,7 +78,7 @@ spec:
         - { name: maven-repo, workspace: maven-repo }
 
     - name: build-image
-      runAfter: [build-jar]
+      runAfter: [build-jar]             # explicit: needs the jar in the workspace (fetch-source is already implicit, via COMMIT below)
       taskRef:
         resolver: cluster
         params:
@@ -91,14 +94,14 @@ spec:
         - { name: source, workspace: source }
         - { name: dockerconfig, workspace: registry-auth }
 
-    - name: acs-image-check
+    - name: acs-image-check              # no runAfter: consuming build-image's IMAGE_DIGEST already orders it after build-image
       taskRef:
         name: acs-image-check
       params:
         - { name: IMAGE, value: "$(params.image-repo)@$(tasks.build-image.results.IMAGE_DIGEST)" }
 
     - name: deploy-dev
-      runAfter: [acs-image-check]
+      runAfter: [acs-image-check]       # explicit: the gate produces no result, so only runAfter keeps deploy behind the scan
       when:
         - { input: $(params.deploy-mode), operator: in, values: ["oc"] }
       params:
@@ -121,6 +124,8 @@ spec:
               oc create deployment ${APP} --image=${IMG} --port=8080 -n ${NS} \
                 --dry-run=client -o yaml | oc apply -n ${NS} -f -
               oc set image deployment/${APP} ${APP}=${IMG} -n ${NS}
+              # same env as the gitops base → Argo CD adopts it without a restart (step 36)
+              oc set env deployment/${APP} -n ${NS} APP_COLOUR=blue
               oc set probe deployment/${APP} -n ${NS} --readiness \
                 --get-url=http://:8080/q/health/ready --initial-delay-seconds=3
               oc annotate deployment/${APP} -n ${NS} --overwrite \
@@ -134,7 +139,7 @@ spec:
               echo "App URL: https://$(oc get route ${APP} -n ${NS} -o jsonpath='{.spec.host}')/api/info"
 
     - name: deploy-gitops
-      runAfter: [acs-image-check]
+      runAfter: [acs-image-check]       # explicit: same gate as deploy-dev (the digest alone would only order it after build-image)
       when:
         - { input: $(params.deploy-mode), operator: in, values: ["gitops"] }
       taskRef:
